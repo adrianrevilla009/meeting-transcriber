@@ -1,0 +1,9 @@
+# Override para usar el Ollama instalado en el host en vez del contenedor.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml up -d db api worker
+# Nota: el worker sale de la red 'backend' aislada para poder alcanzar el host.
+services:
+  worker:
+    environment:
+      MT_OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [backend, edge]
