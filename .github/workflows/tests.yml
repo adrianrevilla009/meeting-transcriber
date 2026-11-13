@@ -41,7 +41,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -e ".[dev]"
-      - run: pytest --cov=app --cov-report=term-missing 2>&1 | tee out.txt
+      - run: |
+          set -o pipefail
+          pytest --cov=app --cov-report=term-missing 2>&1 | tee out.txt
       - name: Anotar fallos
         if: failure()
         run: |

@@ -16,8 +16,7 @@ const SUMMARY = [
   "# Pendiente",
   "- Confirmar pagos en dólares",
   "- Fecha de entrega: 15 de diciembre",
-].join("
-");
+].join("\n");
 
 function setup(m: Partial<MeetingT> = {}, extra: Record<string, unknown> = {}) {
   return mockApi({
