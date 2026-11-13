@@ -8,6 +8,7 @@ x-app: &app
     MT_EXPORT_DIR: /data/exports
     MT_WHISPER_MODELS_DIR: /data/models
     MT_OLLAMA_URL: http://ollama:11434
+    HF_HOME: /data/hf  # caché de Hugging Face en un volumen escribible (el usuario mt no tiene home)
   volumes: [appdata:/data]
   depends_on: [db]
 
@@ -29,6 +30,14 @@ services:
     <<: *app
     command: ["python", "-m", "app.workers.worker"]
     networks: [backend]
+    restart: unless-stopped
+
+  # Frontal React servido por nginx; /api se redirige a la API (sin CORS). Solo en localhost.
+  web:
+    build: ./web
+    ports: ["127.0.0.1:3000:80"]
+    networks: [edge]
+    depends_on: [api]
     restart: unless-stopped
 
   ollama:

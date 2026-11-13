@@ -21,6 +21,26 @@ class MeetingOut(BaseModel):
     finished_at: datetime | None = None
 
 
+class MeetingProgress(BaseModel):
+    chunks_total: int
+    chunks_pending: int
+    chunks_processing: int
+    chunks_done: int
+    chunks_failed: int
+    segments: int
+    events: int
+
+
+class SystemInfo(BaseModel):
+    whisper_model: str
+    whisper_language: str
+    analyzer: str
+    ollama_model: str
+    ollama_reachable: bool
+    ollama_model_installed: bool
+    queue: int
+
+
 class ChunkOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

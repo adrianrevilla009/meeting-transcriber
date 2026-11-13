@@ -1,9 +1,11 @@
 import logging
+
+import httpx
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import Auth
@@ -12,6 +14,7 @@ from app.db import get_session, init_db, session_factory
 from app.models import (
     AuditLog,
     Chunk,
+    ChunkStatus,
     Meeting,
     MeetingStatus,
     Requirement,
@@ -24,10 +27,12 @@ from app.schemas import (
     EventOut,
     MeetingCreate,
     MeetingOut,
+    MeetingProgress,
     RequirementHistory,
     RequirementOut,
     SearchHit,
     SegmentOut,
+    SystemInfo,
 )
 from app.services.export import render_markdown
 from app.services.storage import chunk_path, delete_audio
@@ -77,6 +82,34 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/system", response_model=SystemInfo, dependencies=[Auth])
+def system_info(session: Session = Depends(get_session)):
+    """Modelos configurados, estado de Ollama y cola de trozos pendientes (para el frontal)."""
+    s = get_settings()
+    reachable = installed = False
+    if s.analyzer == "ollama":
+        try:
+            r = httpx.get(f"{s.ollama_url}/api/tags", timeout=3)
+            r.raise_for_status()
+            names = {m["name"] for m in r.json().get("models", [])}
+            reachable = True
+            installed = s.ollama_model in names or f"{s.ollama_model}:latest" in names
+        except (httpx.HTTPError, ValueError, KeyError):
+            pass
+    queue = session.scalar(
+        select(func.count()).select_from(Chunk).where(Chunk.status.in_([ChunkStatus.pending, ChunkStatus.processing]))
+    )
+    return SystemInfo(
+        whisper_model=s.whisper_model,
+        whisper_language=s.whisper_language,
+        analyzer=s.analyzer,
+        ollama_model=s.ollama_model,
+        ollama_reachable=reachable,
+        ollama_model_installed=installed,
+        queue=queue or 0,
+    )
+
+
 @app.post("/meetings", response_model=MeetingOut, status_code=201, dependencies=[Auth])
 def create_meeting(body: MeetingCreate, session: Session = Depends(get_session)):
     m = Meeting(title=body.title, project=body.project)
@@ -96,6 +129,29 @@ def list_meetings(project: str | None = None, session: Session = Depends(get_ses
 @app.get("/meetings/{meeting_id}", response_model=MeetingOut, dependencies=[Auth])
 def get_meeting(meeting_id: int, session: Session = Depends(get_session)):
     return _meeting(session, meeting_id)
+
+
+@app.get("/meetings/{meeting_id}/progress", response_model=MeetingProgress, dependencies=[Auth])
+def meeting_progress(meeting_id: int, session: Session = Depends(get_session)):
+    _meeting(session, meeting_id)
+    counts = {
+        st.value: n
+        for st, n in session.execute(
+            select(Chunk.status, func.count()).where(Chunk.meeting_id == meeting_id).group_by(Chunk.status)
+        ).all()
+    }
+    return MeetingProgress(
+        chunks_total=sum(counts.values()),
+        chunks_pending=counts.get("pending", 0),
+        chunks_processing=counts.get("processing", 0),
+        chunks_done=counts.get("done", 0),
+        chunks_failed=counts.get("failed", 0),
+        segments=session.scalar(select(func.count()).select_from(Segment).where(Segment.meeting_id == meeting_id)) or 0,
+        events=session.scalar(
+            select(func.count()).select_from(RequirementEvent).where(RequirementEvent.meeting_id == meeting_id)
+        )
+        or 0,
+    )
 
 
 @app.post("/meetings/{meeting_id}/chunks", response_model=ChunkOut, status_code=202, dependencies=[Auth])

@@ -26,7 +26,17 @@ curl http://127.0.0.1:8000/health
 ```
 En CPU de 16 GB: `MT_WHISPER_MODEL=small` (o `medium`) y `MT_OLLAMA_MODEL=qwen2.5:7b`. El análisis tardará minutos por reunión.
 
-## Captura (Windows)
+## Frontal web (recomendado)
+```bash
+make start      # descarga modelos si faltan, construye y arranca todo
+make open       # abre http://127.0.0.1:3000 (token: MT_API_TOKEN de .env)
+```
+Desde el navegador puedes grabar (micrófono + audio del sistema, sin instalar nada), seguir el progreso
+de la transcripción, leer el análisis con citas, ver la evolución de los requisitos y buscar en todas las
+reuniones. Al grabar, elige **Toda la pantalla** y marca **Compartir audio del sistema**.
+Desarrollo del frontal con recarga en caliente: `make web-dev` (http://localhost:5173).
+
+## Captura (Windows, alternativa por línea de comandos)
 ```powershell
 pip install PyAudioWPatch numpy soundfile requests
 python agent/capture_agent.py --token TU_TOKEN --title "Kickoff" --project pagos

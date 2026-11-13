@@ -91,3 +91,20 @@ def test_offsets_are_applied(client, env):
     drain()
     segs = client.get(f"/meetings/{mid}/transcript", params={"format": "json"}).json()
     assert segs[0]["start"] == 60.0
+
+
+def test_progress_and_system(client, env):
+    mid = client.post("/meetings", json={"title": "P", "project": "x"}).json()["id"]
+    upload(client, mid, 0, "hola\nadios")
+    upload(client, mid, 1, "otra cosa", offset=45.0)
+    p = client.get(f"/meetings/{mid}/progress").json()
+    assert p["chunks_total"] == 2 and p["chunks_pending"] == 2 and p["segments"] == 0
+    assert client.get("/system").json()["queue"] == 2
+
+    FakeAnalyzer.script = []
+    client.post(f"/meetings/{mid}/finish")
+    drain()
+    p = client.get(f"/meetings/{mid}/progress").json()
+    assert p["chunks_done"] == 2 and p["segments"] == 3
+    info = client.get("/system").json()
+    assert info["queue"] == 0 and info["analyzer"] == "fake"

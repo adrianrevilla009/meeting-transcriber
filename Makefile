@@ -12,6 +12,7 @@ export MSYS_NO_PATHCONV := 1
 
 OLLAMA       ?= host
 API          ?= http://127.0.0.1:8000
+WEB          ?= http://127.0.0.1:3000
 PYTHON       ?= $(shell command -v py >/dev/null 2>&1 && echo py || echo python)
 WHISPER      := $(or $(MT_WHISPER_MODEL),small)
 LLM          := $(or $(MT_OLLAMA_MODEL),qwen2.5:7b)
@@ -19,20 +20,26 @@ AUTH         := -H "Authorization: Bearer $(MT_API_TOKEN)"
 
 ifeq ($(OLLAMA),host)
 COMPOSE  := docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml
-SERVICES := db api worker
+SERVICES := db api worker web
 else
 COMPOSE  := docker compose
-SERVICES := db api worker ollama
+SERVICES := db api worker web ollama
 endif
 
-.PHONY: help start env check models whisper-model llm-model up down restart logs ps health \
+.PHONY: help start open web-dev env check models whisper-model llm-model up down restart logs ps health \
         ollama-check agent-install record meetings transcript events requirements search test clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
 
 start: env check models up ollama-check ## TODO en uno: .env, modelos (si faltan), build, arranque y health
-	@echo ""; echo "Listo. API en $(API)  ->  ahora: make record TITLE=\"Mi reunion\" PROJECT=demo"
+	@echo ""; echo "Listo. Abre $(WEB) (token: MT_API_TOKEN de .env)  ->  make open"
+
+open: ## Abre el frontal en el navegador
+	@explorer "$(WEB)" || true
+
+web-dev: ## Frontal en modo desarrollo con recarga en caliente (http://localhost:5173)
+	cd web && npm install && npm run dev
 
 env: ## Crea .env desde .env.example si no existe
 	@if [ ! -f .env ]; then cp .env.example .env; echo ".env creado: edita POSTGRES_PASSWORD y MT_API_TOKEN y vuelve a lanzar make start"; exit 1; fi
@@ -49,7 +56,7 @@ models: whisper-model llm-model ## Descarga Whisper y el LLM solo si no estan ya
 
 whisper-model: ## Descarga el modelo Whisper al volumen si falta
 	@$(COMPOSE) build -q api
-	@if $(COMPOSE) run --rm --no-deps -T api sh -c 'ls -d /data/models/models--*faster-whisper-$(WHISPER) >/dev/null 2>&1'; then \
+	@if $(COMPOSE) run --rm --no-deps -T api sh -c 'ls /data/models/models--*faster-whisper-$(WHISPER)/snapshots/*/model.bin >/dev/null 2>&1'; then \
 	  echo "OK: Whisper '$(WHISPER)' ya instalado"; \
 	else \
 	  echo "Descargando Whisper '$(WHISPER)'..."; \
@@ -79,8 +86,8 @@ down: ## Para los servicios (conserva datos y modelos)
 
 restart: down up ## Reinicia
 
-logs: ## Sigue los logs de api y worker
-	@$(COMPOSE) logs -f api worker
+logs: ## Sigue los logs de api, worker y web
+	@$(COMPOSE) logs -f api worker web
 
 ps: ## Estado de los contenedores
 	@$(COMPOSE) ps

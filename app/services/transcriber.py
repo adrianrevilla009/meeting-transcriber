@@ -31,6 +31,7 @@ class FasterWhisperTranscriber:
             device=settings.whisper_device,
             compute_type=settings.whisper_compute_type,
             download_root=str(settings.whisper_models_dir),
+            local_files_only=True,  # el modelo se descarga aparte (make models); nunca en caliente
         )
         self.prompt = (
             f"Reunión técnica de negocio. Términos: {settings.glossary}." if settings.glossary else None
