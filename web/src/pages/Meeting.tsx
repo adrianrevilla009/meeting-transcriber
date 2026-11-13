@@ -17,17 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api } from "../api";
-import {
-  downloadText,
-  fmtDate,
-  fmtDuration,
-  fmtTs,
-  meetingTitle,
-  phaseOf,
-  slug,
-  SPEAKER,
-  type Phase,
-} from "../format";
+import { downloadText, fmtDate, fmtDuration, fmtTs, meetingTitle, phaseOf, slug, SPEAKER, type Phase } from "../format";
 import type { Meeting as MeetingT, Progress, Segment } from "../types";
 import { ConfirmButton, Empty, highlight, ProgressBar, ProjectTag, Spinner, StatusPill } from "../components/ui";
 import { useToast } from "../components/Toasts";
