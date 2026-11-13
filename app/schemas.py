@@ -17,6 +17,7 @@ class MeetingOut(BaseModel):
     status: str
     analysis_status: str
     analysis_error: str | None = None
+    summary: str | None = None
     created_at: datetime
     finished_at: datetime | None = None
 

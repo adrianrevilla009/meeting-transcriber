@@ -157,11 +157,10 @@ function parseSummary(text: string): Block[] {
     if (para.length) blocks.push({ type: "p", text: para.join(" ") });
     para = [];
   };
-  for (const raw of text.split(/?
-/)) {
+  for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
-    const bullet = /^[-*•]s+(.*)$/.exec(line);
-    const heading = /^#{1,6}s+(.*)$/.exec(line);
+    const bullet = /^[-*•]\s+(.*)$/.exec(line);
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
     if (!line) {
       flush();
     } else if (bullet) {
