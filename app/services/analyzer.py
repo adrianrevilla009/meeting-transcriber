@@ -1,102 +1,78 @@
-"""Extracción de requisitos/decisiones/dudas con LLM local. El LLM NUNCA reescribe la transcripción:
-solo extrae, y cada elemento debe traer una cita literal que se verifica contra los segmentos."""
+"""Resumen de la reunión con LLM local. El LLM NUNCA reescribe la transcripción:
+solo genera un resumen aparte; los segmentos originales no se tocan."""
 
-import json
 import logging
 from collections.abc import Sequence
 from typing import ClassVar, Protocol
 
 import httpx
-from pydantic import BaseModel, ValidationError
-from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Meeting, Requirement, RequirementEvent, Segment
-from app.services.verifier import locate_quote
+from app.models import Meeting, Segment
 
 log = logging.getLogger(__name__)
 
-KINDS = {"new_requirement", "changed_requirement", "decision", "open_question"}
-
-SYSTEM_PROMPT = """Eres un analista que extrae información de transcripciones de reuniones de proyecto.
+SYSTEM_PROMPT = """Eres un asistente que resume reuniones a partir de su transcripción.
 Reglas estrictas:
-- Extrae SOLO lo que se dice explícitamente. No inventes, no completes, no deduzcas.
-- Cada elemento DEBE incluir "quote": una cita LITERAL, copiada tal cual de la transcripción (máx. 40 palabras).
-- Si no estás seguro, no lo incluyas.
-- Responde únicamente con JSON válido con esta forma:
-{"items":[{"kind":"new_requirement|changed_requirement|decision|open_question",
-"requirement":"nombre corto del requisito (vacío si no aplica)","summary":"una frase","quote":"cita literal"}]}
-Tipos: new_requirement = requisito nuevo; changed_requirement = el negocio modifica o contradice algo dicho antes;
-decision = algo acordado; open_question = duda sin resolver."""
+- Incluye TODO lo relevante que se dijo: temas tratados, datos, cifras, fechas, nombres, acuerdos,
+  tareas, problemas y dudas. No omitas información importante.
+- Usa SOLO lo que aparece en la transcripción. No inventes, no completes, no deduzcas.
+- Escribe en español, en texto claro: párrafos breves y, cuando ayude, listas con "- ".
+- Sin encabezados ni categorías fijas, sin introducción ni despedida: solo el resumen."""
 
-
-class Item(BaseModel):
-    kind: str
-    requirement: str = ""
-    summary: str
-    quote: str
+MERGE_PROMPT = """Recibirás las notas de resumen de partes consecutivas de una misma reunión.
+Únelas en un único resumen coherente y ordenado, sin repetir información y sin perder ningún
+dato relevante (cifras, fechas, nombres, acuerdos, tareas, dudas). No inventes nada.
+Escribe en español, con párrafos breves y listas con "- " cuando ayude. Sin encabezados, introducción ni despedida."""
 
 
 class Analyzer(Protocol):
-    def extract(self, transcript_window: str) -> list[Item]: ...
+    def summarize(self, transcript_window: str) -> str: ...
+
+    def merge(self, partial_summaries: list[str]) -> str: ...
 
 
 class OllamaAnalyzer:
     def __init__(self):
         self.s = get_settings()
 
-    def extract(self, transcript_window: str) -> list[Item]:
+    def _chat(self, system: str, user: str) -> str:
         resp = httpx.post(
             f"{self.s.ollama_url}/api/chat",
             json={
                 "model": self.s.ollama_model,
                 "stream": False,
-                "format": "json",
                 "options": {"temperature": 0},
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Transcripción:\n\n{transcript_window}"},
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
                 ],
             },
             timeout=self.s.ollama_timeout,
         )
         resp.raise_for_status()
-        content = resp.json()["message"]["content"]
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            log.warning("Respuesta del LLM no es JSON, se descarta la ventana")
-            return []
-        raw = data.get("items", []) if isinstance(data, dict) else []
-        if not isinstance(raw, list):
-            log.warning("Respuesta del LLM sin lista de items, se descarta la ventana")
-            return []
-        # Se valida elemento a elemento: uno mal formado no debe tirar los demás.
-        items, dropped = [], 0
-        for i in raw:
-            if isinstance(i, dict) and "kind" not in i:
-                # Error típico de modelos pequeños: el tipo como clave ({"decision": "...", ...}).
-                kind = next((k for k in KINDS if k in i), None)
-                if kind:
-                    i = {**i, "kind": kind}
-            try:
-                items.append(Item.model_validate(i))
-            except ValidationError:
-                dropped += 1
-        if dropped:
-            log.warning("Se descartan %s elementos mal formados del LLM", dropped)
-        return items
+        return str(resp.json()["message"]["content"]).strip()
+
+    def summarize(self, transcript_window: str) -> str:
+        return self._chat(SYSTEM_PROMPT, f"Transcripción:\n\n{transcript_window}")
+
+    def merge(self, partial_summaries: list[str]) -> str:
+        parts = "\n\n".join(f"--- Parte {i} ---\n{p}" for i, p in enumerate(partial_summaries, 1))
+        return self._chat(MERGE_PROMPT, parts)
 
 
 class FakeAnalyzer:
-    """Para tests: devuelve el guion `script` (lista de Item) sin llamar a ningún LLM."""
+    """Para tests: devuelve `script` como resumen de cada ventana, sin llamar a ningún LLM."""
 
-    script: ClassVar[list[Item]] = []
+    script: ClassVar[str] = ""
 
-    def extract(self, transcript_window: str) -> list[Item]:
-        return list(self.script)
+    def summarize(self, transcript_window: str) -> str:
+        return self.script
+
+    def merge(self, partial_summaries: list[str]) -> str:
+        return "\n\n".join(partial_summaries)
 
 
 def get_analyzer() -> Analyzer | None:
@@ -124,70 +100,21 @@ def _windows(segments: Sequence[Segment], max_chars: int) -> list[str]:
     return out
 
 
-def _match_requirement(session: Session, project: str, name: str, threshold: float) -> Requirement:
-    existing = session.scalars(select(Requirement).where(Requirement.project == project)).all()
-    best, best_score = None, 0.0
-    for r in existing:
-        score = fuzz.token_set_ratio(name.lower(), r.title.lower())
-        if score > best_score:
-            best, best_score = r, score
-    if best is not None and best_score >= threshold:
-        return best
-    req = Requirement(project=project, title=name)
-    session.add(req)
-    session.flush()
-    return req
-
-
-def analyze_meeting(session: Session, meeting: Meeting) -> dict:
-    """Ejecuta el análisis y guarda solo los elementos cuya cita se verifica."""
+def analyze_meeting(session: Session, meeting: Meeting) -> None:
+    """Genera el resumen de la reunión (por ventanas si es larga) y lo guarda."""
     s = get_settings()
     analyzer = get_analyzer()
     if analyzer is None:
         meeting.analysis_status = "skipped"
         session.commit()
-        return {"accepted": 0, "rejected": 0}
+        return
 
     segments = session.scalars(select(Segment).where(Segment.meeting_id == meeting.id).order_by(Segment.start)).all()
-    # Reanálisis: reemplaza los eventos previos de esta reunión.
-    for ev in list(meeting.events):
-        session.delete(ev)
-    session.flush()
-
-    accepted = rejected = 0
-    seen: set[tuple[str, str]] = set()
-    for window in _windows(segments, s.analysis_window_chars):
-        for item in analyzer.extract(window):
-            if item.kind not in KINDS:
-                rejected += 1
-                continue
-            seg = locate_quote(item.quote, segments, s.quote_min_score)
-            if seg is None:
-                rejected += 1  # cita no verificable: posible alucinación
-                continue
-            key = (item.kind, seg.id.__str__() + item.summary.lower()[:40])
-            if key in seen:
-                continue
-            seen.add(key)
-            req_id = None
-            if item.requirement.strip() and item.kind != "open_question":
-                req_id = _match_requirement(
-                    session, meeting.project, item.requirement.strip(), s.requirement_match_score
-                ).id
-            session.add(
-                RequirementEvent(
-                    requirement_id=req_id,
-                    meeting_id=meeting.id,
-                    segment_id=seg.id,
-                    kind=item.kind,
-                    summary=item.summary,
-                    quote=item.quote,
-                    timestamp=seg.start,
-                )
-            )
-            accepted += 1
+    windows = _windows(segments, s.analysis_window_chars)
+    partials = [p for w in windows if (p := analyzer.summarize(w).strip())]
+    summary = partials[0] if len(partials) == 1 else analyzer.merge(partials) if partials else ""
+    meeting.summary = summary.strip() or None
     meeting.analysis_status = "done"
     meeting.analysis_error = None
     session.commit()
-    log.info("Análisis reunión %s: %s aceptados, %s rechazados", meeting.id, accepted, rejected)
-    return {"accepted": accepted, "rejected": rejected}
+    log.info("Resumen de la reunión %s generado (%s ventanas)", meeting.id, len(windows))

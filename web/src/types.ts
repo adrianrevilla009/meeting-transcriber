@@ -8,6 +8,7 @@ export interface Meeting {
   status: MeetingStatus;
   analysis_status: AnalysisStatus;
   analysis_error: string | null;
+  summary: string | null;
   created_at: string;
   finished_at: string | null;
 }
@@ -19,7 +20,6 @@ export interface Progress {
   chunks_done: number;
   chunks_failed: number;
   segments: number;
-  events: number;
 }
 
 export interface Segment {
@@ -30,32 +30,6 @@ export interface Segment {
   text: string;
   avg_logprob: number | null;
   low_confidence: boolean;
-}
-
-export type EventKind = "new_requirement" | "changed_requirement" | "decision" | "open_question";
-
-export interface MtEvent {
-  id: number;
-  requirement_id: number | null;
-  meeting_id: number;
-  segment_id: number | null;
-  kind: EventKind;
-  summary: string;
-  quote: string;
-  timestamp: number | null;
-  created_at: string;
-}
-
-export interface Requirement {
-  id: number;
-  project: string;
-  title: string;
-  created_at: string;
-}
-
-export interface RequirementHistory {
-  requirement: Requirement;
-  events: MtEvent[];
 }
 
 export interface SearchHit {

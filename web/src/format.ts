@@ -1,4 +1,4 @@
-import type { EventKind, Meeting } from "./types";
+import type { Meeting } from "./types";
 
 export function fmtTs(seconds: number | null | undefined): string {
   const s = Math.max(0, Math.floor(seconds ?? 0));
@@ -56,13 +56,6 @@ export const PHASE_LABEL: Record<Phase, string> = {
 };
 
 export const isBusy = (p: Phase) => p === "transcribing" || p === "analyzing";
-
-export const KIND: Record<EventKind, { label: string; plural: string; tone: string }> = {
-  new_requirement: { label: "Requisito nuevo", plural: "Requisitos nuevos", tone: "green" },
-  changed_requirement: { label: "Cambio", plural: "Cambios de requisitos", tone: "amber" },
-  decision: { label: "Decisión", plural: "Decisiones", tone: "violet" },
-  open_question: { label: "Duda abierta", plural: "Dudas abiertas", tone: "sky" },
-};
 
 export const SPEAKER: Record<string, string> = { mic: "Yo", system: "Otros", mix: "Audio" };
 

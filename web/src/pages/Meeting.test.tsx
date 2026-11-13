@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Meeting } from "./Meeting";
-import { event, meeting, mockApi, progress, renderApp, requirement, segment } from "../test/utils";
+import { meeting, mockApi, progress, renderApp, segment } from "../test/utils";
 import type { Meeting as MeetingT } from "../types";
 
 const SEGMENTS = [
@@ -10,33 +10,20 @@ const SEGMENTS = [
   segment({ id: 2, source: "system", start: 3, text: "Queremos pagar con Bizum." }),
   segment({ id: 3, source: "mic", start: 8, text: "Lo apunto, ¿y en dólares?", low_confidence: true }),
 ];
-const EVENTS = [
-  event({
-    id: 1,
-    kind: "new_requirement",
-    requirement_id: 7,
-    segment_id: 2,
-    timestamp: 3,
-    summary: "Pago con Bizum",
-    quote: "pagar con Bizum",
-  }),
-  event({
-    id: 2,
-    kind: "open_question",
-    segment_id: 3,
-    timestamp: 8,
-    summary: "¿Pagos en dólares?",
-    quote: "y en dólares",
-  }),
-];
+const SUMMARY = [
+  "Se acordó que el cliente podrá pagar con Bizum.",
+  "",
+  "# Pendiente",
+  "- Confirmar pagos en dólares",
+  "- Fecha de entrega: 15 de diciembre",
+].join("
+");
 
 function setup(m: Partial<MeetingT> = {}, extra: Record<string, unknown> = {}) {
   return mockApi({
-    "GET /meetings/1": meeting(m),
+    "GET /meetings/1": meeting({ summary: SUMMARY, ...m }),
     "GET /meetings/1/progress": progress(),
     "GET /meetings/1/transcript": SEGMENTS,
-    "GET /meetings/1/events": EVENTS,
-    "GET /requirements": [requirement({ id: 7, title: "Método de pago" })],
     ...extra,
   });
 }
@@ -44,30 +31,22 @@ function setup(m: Partial<MeetingT> = {}, extra: Record<string, unknown> = {}) {
 const open = (route = "/meetings/1") => renderApp(<Meeting />, { route, path: "/meetings/:id" });
 
 describe("Meeting page", () => {
-  it("shows header, finished stepper and grouped AI insights with quotes", async () => {
+  it("shows header, finished stepper and the AI summary rendered as paragraphs and lists", async () => {
     setup();
     open();
     expect(await screen.findByRole("heading", { name: "Kickoff" })).toBeInTheDocument();
     expect(screen.getByText("42 min", { exact: false })).toBeInTheDocument();
     expect(document.querySelectorAll(".step-done")).toHaveLength(4);
 
-    const col = (await screen.findByText("Pago con Bizum")).closest(".insight-col") as HTMLElement;
-    expect(within(col).getByText("Requisitos nuevos")).toBeInTheDocument();
-    expect(within(col).getByText("Pago con Bizum")).toBeInTheDocument();
-    expect(within(col).getByText("pagar con Bizum")).toBeInTheDocument();
-    expect(within(col).getByRole("link", { name: "Método de pago" })).toHaveAttribute("href", "/requirements?focus=7");
-    const questions = screen.getByText("Dudas abiertas").closest(".insight-col") as HTMLElement;
-    expect(within(questions).getByText("¿Pagos en dólares?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Análisis IA/ })).toHaveTextContent("Análisis IA2");
-  });
-
-  it("jumps from an insight to its sentence in the transcript", async () => {
-    setup();
-    open();
-    await userEvent.click(await screen.findByRole("button", { name: /00:03 · ver en la transcripción/ }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/meetings/1?seg=2");
-    expect(await screen.findByText("Queremos pagar con Bizum.")).toBeInTheDocument();
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    const first = await screen.findByText("Se acordó que el cliente podrá pagar con Bizum.");
+    const summary = first.closest(".summary") as HTMLElement;
+    expect(within(summary).getByRole("heading", { name: "Pendiente" })).toBeInTheDocument();
+    const items = within(summary).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      "Confirmar pagos en dólares",
+      "Fecha de entrega: 15 de diciembre",
+    ]);
+    expect(screen.getByRole("button", { name: /Resumen/ })).toBeInTheDocument();
   });
 
   it("opens the transcript directly from a ?seg= link", async () => {
@@ -103,7 +82,7 @@ describe("Meeting page", () => {
     expect(screen.getByText("Lo apunto, ¿y en dólares?")).toBeInTheDocument();
   });
 
-  it("shows live transcription progress and skeletons while processing", async () => {
+  it("shows live transcription progress and a placeholder while processing", async () => {
     setup(
       { status: "finished", analysis_status: "pending" },
       { "GET /meetings/1/progress": progress({ chunks_total: 4, chunks_done: 1, segments: 2 }) },
@@ -111,7 +90,7 @@ describe("Meeting page", () => {
     open();
     expect(await screen.findByText("1/4 · 2 frases")).toBeInTheDocument();
     expect(document.querySelector(".step-active")).toHaveTextContent("Transcripción");
-    expect(screen.getByText(/El análisis empieza al terminar/)).toBeInTheDocument();
+    expect(screen.getByText(/El resumen se genera al terminar/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reanalizar/ })).toBeDisabled();
   });
 
@@ -169,17 +148,16 @@ describe("Meeting page", () => {
     await vi.waitFor(() => expect(click).toHaveBeenCalled());
   });
 
-  it("shows a loading state instead of 'no findings' while events load", async () => {
-    setup({}, { "GET /meetings/1/events": () => new Promise(() => undefined) });
+  it("explains when the analysis is disabled", async () => {
+    setup({ analysis_status: "skipped", summary: null });
     open();
-    expect(await screen.findByText("Cargando el análisis…")).toBeInTheDocument();
-    expect(screen.queryByText("Sin hallazgos")).not.toBeInTheDocument();
+    expect(await screen.findByText("Resumen desactivado")).toBeInTheDocument();
   });
 
-  it("empty analysis after a finished meeting", async () => {
-    setup({}, { "GET /meetings/1/events": [] });
+  it("explains when there is nothing to summarize", async () => {
+    setup({ summary: "  " });
     open();
-    expect(await screen.findByText("Sin hallazgos")).toBeInTheDocument();
+    expect(await screen.findByText("Sin resumen")).toBeInTheDocument();
   });
 
   it("unknown meeting", async () => {

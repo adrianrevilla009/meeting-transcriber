@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, FileText, FolderKanban, ListChecks, Mic, Search, Sparkles } from "lucide-react";
+import { CalendarClock, FileText, FolderKanban, Mic, Search, Sparkles } from "lucide-react";
 import { api } from "../api";
 import { fmtDuration, fmtRelative, isBusy, meetingTitle, phaseOf } from "../format";
 import type { Meeting } from "../types";
@@ -70,7 +70,6 @@ export function Dashboard() {
     refetchInterval: (q) =>
       q.state.data?.some((m) => phaseOf(m) !== "ready" && phaseOf(m) !== "failed") ? 4000 : 20_000,
   });
-  const { data: requirements } = useQuery({ queryKey: ["requirements"], queryFn: () => api.requirements() });
 
   const projects = useMemo(
     () => [...new Set((meetings ?? []).map((m) => m.project).filter(Boolean))].sort(),
@@ -87,7 +86,6 @@ export function Dashboard() {
   const stats = [
     { icon: FileText, label: "Reuniones", value: meetings?.length ?? "–", tone: "violet" },
     { icon: Sparkles, label: "En proceso", value: processing, tone: "cyan" },
-    { icon: ListChecks, label: "Requisitos", value: requirements?.length ?? "–", tone: "green" },
     { icon: FolderKanban, label: "Proyectos", value: projects.length, tone: "pink" },
   ];
 
@@ -100,8 +98,8 @@ export function Dashboard() {
             Graba. Transcribe. <span className="gradient-text">Entiende.</span>
           </h1>
           <p className="muted">
-            Pulsa grabar al empezar la reunión. Al terminar, Whisper la transcribe y la IA extrae requisitos, decisiones
-            y dudas — todo en tu máquina.
+            Pulsa grabar al empezar la reunión. Al terminar, Whisper la transcribe y la IA redacta un resumen con todo
+            lo relevante — todo en tu máquina.
           </p>
         </div>
         <button className="record-cta" onClick={() => navigate("/record")}>

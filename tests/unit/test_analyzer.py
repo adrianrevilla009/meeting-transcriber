@@ -1,4 +1,4 @@
-"""Cliente de Ollama y troceado de la transcripción (sin LLM real)."""
+"""Resumen con Ollama y troceado de la transcripción (sin LLM real)."""
 
 import itertools
 
@@ -7,7 +7,7 @@ import pytest
 
 from app.models import Segment
 from app.services import analyzer
-from app.services.analyzer import Item, OllamaAnalyzer, _windows, get_analyzer
+from app.services.analyzer import OllamaAnalyzer, _windows, get_analyzer
 
 
 class FakeResponse:
@@ -40,76 +40,38 @@ def ollama(env, set_env, monkeypatch):
     return respond, calls
 
 
-def test_ollama_request_is_deterministic_json_with_system_prompt(ollama):
+def test_summarize_request_is_deterministic_with_system_prompt(ollama):
     respond, calls = ollama
-    respond('{"items": []}')
-    OllamaAnalyzer().extract("Transcripción de prueba")
+    respond("Se acordó migrar a Postgres.")
+    assert OllamaAnalyzer().summarize("Transcripción de prueba") == "Se acordó migrar a Postgres."
     req = calls[0]
     assert req["url"].endswith("/api/chat")
     body = req["json"]
-    assert body["model"] == "qwen-test"
-    assert body["format"] == "json" and body["stream"] is False
+    assert body["model"] == "qwen-test" and body["stream"] is False
     assert body["options"]["temperature"] == 0
-    assert body["messages"][0]["role"] == "system" and "LITERAL" in body["messages"][0]["content"]
+    assert body["messages"][0]["role"] == "system" and "TODO lo relevante" in body["messages"][0]["content"]
     assert "Transcripción de prueba" in body["messages"][1]["content"]
 
 
-def test_ollama_items_are_parsed(ollama):
+def test_summary_is_stripped(ollama):
     respond, _ = ollama
-    respond(
-        '{"items":[{"kind":"decision","requirement":"Entrega","summary":"Se entrega en diciembre",'
-        '"quote":"se entregará el quince de diciembre"}]}'
-    )
-    items = OllamaAnalyzer().extract("x")
-    assert items == [
-        Item(
-            kind="decision",
-            requirement="Entrega",
-            summary="Se entrega en diciembre",
-            quote="se entregará el quince de diciembre",
-        )
-    ]
+    respond("  \nResumen con espacios.\n\n")
+    assert OllamaAnalyzer().summarize("x") == "Resumen con espacios."
 
 
-@pytest.mark.parametrize(
-    "content",
-    [
-        "esto no es json",
-        '{"items": [{"kind": "decision"}]}',  # faltan campos obligatorios
-        '{"items": "no es una lista"}',
-        "[]",
-    ],
-)
-def test_malformed_llm_output_is_discarded(ollama, content):
-    respond, _ = ollama
-    respond(content)
-    assert OllamaAnalyzer().extract("x") == []
-
-
-def test_one_malformed_item_does_not_discard_the_valid_ones(ollama):
-    respond, _ = ollama
-    respond(
-        '{"items":[{"kind":"decision","summary":"ok","quote":"cita válida larga"},{"summary":"sin tipo ni cita"},"basura"]}'
-    )
-    assert [i.summary for i in OllamaAnalyzer().extract("x")] == ["ok"]
-
-
-def test_kind_written_as_key_is_repaired(ollama):
-    # Respuesta real de qwen2.5:7b capturada en el e2e.
-    respond, _ = ollama
-    respond(
-        '{"items":[{"kind":"new_requirement","requirement":"","summary":"Pago","quote":"pagar con tarjeta"},'
-        '{"decision":"delivery_date","requirement":"","summary":"Fecha de entrega","quote":"se entregará el 15 de diciembre"},'
-        '{"open_question":"currency_support","requirement":"","summary":"Divisas","quote":"soporte para pagos en dólares"}]}'
-    )
-    assert [i.kind for i in OllamaAnalyzer().extract("x")] == ["new_requirement", "decision", "open_question"]
+def test_merge_sends_every_partial_summary(ollama):
+    respond, calls = ollama
+    respond("Resumen final")
+    assert OllamaAnalyzer().merge(["Parte A", "Parte B"]) == "Resumen final"
+    user = calls[0]["json"]["messages"][1]["content"]
+    assert "Parte A" in user and "Parte B" in user
 
 
 def test_http_errors_propagate_so_the_worker_marks_failure(ollama):
     respond, _ = ollama
     respond("{}", status=500)
     with pytest.raises(httpx.HTTPStatusError):
-        OllamaAnalyzer().extract("x")
+        OllamaAnalyzer().summarize("x")
 
 
 @pytest.mark.parametrize(
@@ -131,7 +93,7 @@ def test_windows_fit_in_budget_and_overlap_two_segments():
     for w in windows:
         assert len(w.replace("\n", "")) <= 200 + 50  # un segmento puede desbordar el último hueco
     for a, b in itertools.pairwise(windows):
-        assert a.splitlines()[-2:] == b.splitlines()[:2]  # solape para no cortar citas
+        assert a.splitlines()[-2:] == b.splitlines()[:2]  # solape para no cortar frases
     joined = "\n".join(windows)
     assert all(t in joined for t in texts)  # no se pierde nada
 

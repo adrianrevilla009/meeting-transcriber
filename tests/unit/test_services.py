@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.deps import require_token
-from app.models import Meeting, Requirement, RequirementEvent, Segment
+from app.models import Meeting, Segment
 from app.services.export import fmt_ts, render_markdown
 from app.services.storage import chunk_path, delete_audio
 from app.services.transcriber import FakeTranscriber
@@ -17,35 +17,20 @@ def test_fmt_ts(secs, out):
     assert fmt_ts(secs) == out
 
 
-def test_markdown_contains_analysis_speakers_and_flags(session):
-    m = Meeting(title="Kickoff", project="pagos", created_at=datetime(2026, 11, 13, 10, 30, tzinfo=UTC))
+def test_markdown_contains_summary_speakers_and_flags(session):
+    m = Meeting(
+        title="Kickoff",
+        project="pagos",
+        created_at=datetime(2026, 11, 13, 10, 30, tzinfo=UTC),
+        summary="Se acordó pagar con Bizum.\n- Entrega el 15 de diciembre",
+    )
     session.add(m)
     session.flush()
-    s1 = Segment(meeting_id=m.id, source="mic", start=0, end=4, text="Quiero pagar con Bizum.")
-    s2 = Segment(meeting_id=m.id, source="system", start=65, end=70, text="Se oyó fatal.", low_confidence=True)
-    req = Requirement(project="pagos", title="Método de pago")
-    session.add_all([s1, s2, req])
-    session.flush()
-    session.add(
-        RequirementEvent(
-            meeting_id=m.id,
-            requirement_id=req.id,
-            segment_id=s1.id,
-            kind="new_requirement",
-            summary="Pago con Bizum",
-            quote="pagar con Bizum",
-            timestamp=0,
-        )
-    )
-    session.add(
-        RequirementEvent(
-            meeting_id=m.id,
-            segment_id=s2.id,
-            kind="open_question",
-            summary="¿Qué se dijo?",
-            quote="se oyó fatal",
-            timestamp=65,
-        )
+    session.add_all(
+        [
+            Segment(meeting_id=m.id, source="mic", start=0, end=4, text="Quiero pagar con Bizum."),
+            Segment(meeting_id=m.id, source="system", start=65, end=70, text="Se oyó fatal.", low_confidence=True),
+        ]
     )
     session.commit()
 
@@ -53,20 +38,19 @@ def test_markdown_contains_analysis_speakers_and_flags(session):
     assert md.startswith("# Kickoff")
     assert "- Proyecto: pagos" in md and "2026-11-13 10:30" in md
     assert "baja confianza): 1" in md
-    assert "### Requisitos nuevos" in md and "**Método de pago** — Pago con Bizum (`00:00:00`)" in md
-    assert "### Dudas abiertas" in md and "> se oyó fatal" in md
-    assert "### Decisiones" not in md  # las secciones vacías no aparecen
+    assert "## Resumen\n\nSe acordó pagar con Bizum.\n- Entrega el 15 de diciembre" in md
+    assert md.index("## Resumen") < md.index("## Transcripción")
     assert "`[00:00:00]` **Yo:** Quiero pagar con Bizum." in md
     assert "`[00:01:05]` **Otros:** Se oyó fatal. `[?]`" in md
 
 
-def test_markdown_untitled_meeting_without_analysis(session):
+def test_markdown_untitled_meeting_without_summary(session):
     m = Meeting(title="", project="")
     session.add(m)
     session.commit()
     md = render_markdown(session, m)
     assert md.startswith(f"# Reunión {m.id}")
-    assert "## Análisis" not in md
+    assert "## Resumen" not in md
 
 
 def test_chunk_path_is_sanitized_and_contained(env):

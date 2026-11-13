@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Dashboard } from "./Dashboard";
-import { meeting, mockApi, progress, renderApp, requirement } from "../test/utils";
+import { meeting, mockApi, progress, renderApp } from "../test/utils";
 
 const MEETINGS = [
   meeting({ id: 3, title: "Revisión sprint", project: "web", status: "finished", analysis_status: "pending" }),
@@ -13,7 +13,6 @@ const MEETINGS = [
 function setup(meetings = MEETINGS) {
   return mockApi({
     "GET /meetings": meetings,
-    "GET /requirements": [requirement({ id: 1 }), requirement({ id: 2 })],
     "GET /meetings/3/progress": progress({ chunks_total: 4, chunks_done: 1 }),
     "GET /meetings/2/progress": progress(),
   });
@@ -29,7 +28,6 @@ describe("Dashboard", () => {
       screen.getByText(label, { selector: ".stat .small" }).previousElementSibling?.textContent;
     expect(stat("Reuniones")).toBe("3");
     expect(stat("En proceso")).toBe("2");
-    expect(stat("Requisitos")).toBe("2");
     expect(stat("Proyectos")).toBe("2");
     expect(screen.getByText("Reunión #1")).toBeInTheDocument(); // sin título
     expect(screen.getByText("Transcribiendo")).toBeInTheDocument();
@@ -81,7 +79,6 @@ describe("Dashboard", () => {
   it("shows API errors", async () => {
     mockApi({
       "GET /meetings": new Response(JSON.stringify({ detail: "BD caída" }), { status: 500 }),
-      "GET /requirements": [],
     });
     renderApp(<Dashboard />);
     expect(await screen.findByText("BD caída")).toBeInTheDocument();

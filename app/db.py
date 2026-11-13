@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -34,7 +34,17 @@ def session_factory() -> sessionmaker:
 def init_db() -> None:
     from app import models  # noqa: F401
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
+
+
+def _add_missing_columns(engine) -> None:
+    """Bases creadas antes de existir `meetings.summary`: create_all no altera tablas existentes."""
+    cols = {c["name"] for c in inspect(engine).get_columns("meetings")}
+    if "summary" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE meetings ADD COLUMN summary TEXT"))
 
 
 def get_session() -> Iterator[Session]:

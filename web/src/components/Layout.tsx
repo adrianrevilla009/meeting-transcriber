@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AudioLines, Cpu, LayoutDashboard, ListChecks, LogOut, Mic, Search, Sparkles } from "lucide-react";
+import { AudioLines, Cpu, LayoutDashboard, LogOut, Mic, Search, Sparkles } from "lucide-react";
 import { api } from "../api";
 import { fmtTs } from "../format";
 import { useElapsed, useRecorder } from "../recorder/RecorderContext";
@@ -74,7 +74,6 @@ export function Layout({ onLogout }: { onLogout: () => void }) {
   const nav = [
     { to: "/", icon: LayoutDashboard, label: "Reuniones", end: true },
     { to: "/record", icon: Mic, label: "Grabar" },
-    { to: "/requirements", icon: ListChecks, label: "Requisitos" },
     { to: "/search", icon: Search, label: "Buscar" },
   ];
   return (

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ConfirmButton, highlight, KindBadge, ProgressBar, ProjectTag, StatusPill } from "./ui";
+import { ConfirmButton, highlight, ProgressBar, ProjectTag, StatusPill } from "./ui";
 
 describe("StatusPill", () => {
   it.each([
@@ -16,15 +16,13 @@ describe("StatusPill", () => {
   });
 });
 
-it("KindBadge and ProjectTag", () => {
+it("ProjectTag", () => {
   const { container } = render(
     <>
-      <KindBadge kind="open_question" />
       <ProjectTag name="pagos" />
       <ProjectTag name="" />
     </>,
   );
-  expect(screen.getByText("Duda abierta")).toHaveClass("tone-sky");
   expect(screen.getByText("#pagos")).toBeInTheDocument();
   expect(container.querySelectorAll(".tag")).toHaveLength(1);
 });

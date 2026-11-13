@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { PHASE_LABEL, KIND, type Phase } from "../format";
-import type { EventKind } from "../types";
+import { PHASE_LABEL, type Phase } from "../format";
 
 export function StatusPill({ phase }: { phase: Phase }) {
   return (
@@ -10,10 +9,6 @@ export function StatusPill({ phase }: { phase: Phase }) {
       {PHASE_LABEL[phase]}
     </span>
   );
-}
-
-export function KindBadge({ kind }: { kind: EventKind }) {
-  return <span className={`badge tone-${KIND[kind].tone}`}>{KIND[kind].label}</span>;
 }
 
 export function ProjectTag({ name }: { name: string }) {

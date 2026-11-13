@@ -28,7 +28,6 @@ class MeetingProgress(BaseModel):
     chunks_done: int
     chunks_failed: int
     segments: int
-    events: int
 
 
 class SystemInfo(BaseModel):
@@ -61,34 +60,6 @@ class SegmentOut(BaseModel):
     text: str
     avg_logprob: float | None
     low_confidence: bool
-
-
-class EventOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    requirement_id: int | None
-    meeting_id: int
-    segment_id: int | None
-    kind: str
-    summary: str
-    quote: str
-    timestamp: float | None
-    created_at: datetime
-
-
-class RequirementOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    project: str
-    title: str
-    created_at: datetime
-
-
-class RequirementHistory(BaseModel):
-    requirement: RequirementOut
-    events: list[EventOut]
 
 
 class SearchHit(BaseModel):

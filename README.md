@@ -7,7 +7,7 @@ Transcripción local y privada de reuniones. Nada sale de tu máquina/red: Whisp
 [Windows] capture_agent.py ──HTTP──▶ api (FastAPI) ──▶ Postgres (datos + cola SKIP LOCKED)
                                                          ▲
                                    worker ── faster-whisper ──▶ segmentos (transcripción cruda, inmutable)
-                                      └──── Ollama (LLM) ──▶ requisitos/decisiones/dudas con CITA VERIFICADA
+                                      └──── Ollama (LLM) ──▶ resumen de la reunión (la transcripción no se toca)
                                                          └──▶ exports/meeting_N.md
 ```
 Principios de fiabilidad:
@@ -32,7 +32,7 @@ make start      # descarga modelos si faltan, construye y arranca todo
 make open       # abre http://127.0.0.1:3000 (token: MT_API_TOKEN de .env)
 ```
 Desde el navegador puedes grabar (micrófono + audio del sistema, sin instalar nada), seguir el progreso
-de la transcripción, leer el análisis con citas, ver la evolución de los requisitos y buscar en todas las
+de la transcripción, leer el resumen y buscar en todas las
 reuniones. Al grabar, elige **Toda la pantalla** y marca **Compartir audio del sistema**.
 Desarrollo del frontal con recarga en caliente: `make web-dev` (http://localhost:5173).
 
@@ -47,9 +47,7 @@ Graba tu micro (`mic`, aparece como "Yo") y el audio del sistema (`system`, "Otr
 ## Uso
 | Endpoint | Para qué |
 |---|---|
-| `GET /meetings/{id}/transcript` (`?format=json`) | Transcripción + análisis en `.md` |
-| `GET /meetings/{id}/events` | Requisitos/decisiones/dudas detectados |
-| `GET /requirements?project=X` / `/requirements/{id}/history` | Cómo evoluciona cada requisito entre reuniones |
+| `GET /meetings/{id}/transcript` (`?format=json`) | Resumen + transcripción en `.md` |
 | `GET /search?q=texto` | Búsqueda en todas las transcripciones |
 | `POST /meetings/{id}/analyze` | Reanalizar (p. ej. tras cambiar de modelo) |
 | `DELETE /meetings/{id}` | Borrar todo rastro de una reunión |

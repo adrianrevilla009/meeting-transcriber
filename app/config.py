@@ -41,8 +41,6 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b"
     ollama_timeout: float = 900.0
     analysis_window_chars: int = 6000
-    quote_min_score: float = 92.0  # similitud mínima (0-100) para aceptar una cita
-    requirement_match_score: float = 85.0  # similitud para unir un requisito a uno existente
 
 
 @lru_cache

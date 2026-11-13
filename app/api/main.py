@@ -16,19 +16,14 @@ from app.models import (
     ChunkStatus,
     Meeting,
     MeetingStatus,
-    Requirement,
-    RequirementEvent,
     Segment,
     utcnow,
 )
 from app.schemas import (
     ChunkOut,
-    EventOut,
     MeetingCreate,
     MeetingOut,
     MeetingProgress,
-    RequirementHistory,
-    RequirementOut,
     SearchHit,
     SegmentOut,
     SystemInfo,
@@ -146,10 +141,6 @@ def meeting_progress(meeting_id: int, session: Session = Depends(get_session)):
         chunks_done=counts.get("done", 0),
         chunks_failed=counts.get("failed", 0),
         segments=session.scalar(select(func.count()).select_from(Segment).where(Segment.meeting_id == meeting_id)) or 0,
-        events=session.scalar(
-            select(func.count()).select_from(RequirementEvent).where(RequirementEvent.meeting_id == meeting_id)
-        )
-        or 0,
     )
 
 
@@ -212,14 +203,6 @@ def reanalyze(meeting_id: int, session: Session = Depends(get_session)):
     return m
 
 
-@app.get("/meetings/{meeting_id}/events", response_model=list[EventOut], dependencies=[Auth])
-def meeting_events(meeting_id: int, session: Session = Depends(get_session)):
-    _meeting(session, meeting_id)
-    return session.scalars(
-        select(RequirementEvent).where(RequirementEvent.meeting_id == meeting_id).order_by(RequirementEvent.id)
-    ).all()
-
-
 @app.delete("/meetings/{meeting_id}", status_code=204, dependencies=[Auth])
 def delete_meeting(meeting_id: int, session: Session = Depends(get_session)):
     m = _meeting(session, meeting_id)
@@ -227,24 +210,6 @@ def delete_meeting(meeting_id: int, session: Session = Depends(get_session)):
         delete_audio(c.path)
     session.delete(m)
     session.commit()
-
-
-@app.get("/requirements", response_model=list[RequirementOut], dependencies=[Auth])
-def list_requirements(project: str | None = None, session: Session = Depends(get_session)):
-    q = select(Requirement).order_by(Requirement.id)
-    if project:
-        q = q.where(Requirement.project == project)
-    return session.scalars(q).all()
-
-
-@app.get("/requirements/{req_id}/history", response_model=RequirementHistory, dependencies=[Auth])
-def requirement_history(req_id: int, session: Session = Depends(get_session)):
-    r = session.get(Requirement, req_id)
-    if not r:
-        raise HTTPException(404, "Requisito no encontrado")
-    return RequirementHistory(
-        requirement=RequirementOut.model_validate(r), events=[EventOut.model_validate(e) for e in r.events]
-    )
 
 
 @app.get("/search", response_model=list[SearchHit], dependencies=[Auth])

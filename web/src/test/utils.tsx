@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi } from "vitest";
 import { ToastProvider } from "../components/Toasts";
 import { RecorderProvider } from "../recorder/RecorderContext";
-import type { Meeting, MtEvent, Progress, Requirement, Segment } from "../types";
+import type { Meeting, Progress, Segment } from "../types";
 
 type Handler = unknown | ((req: { url: URL; init: RequestInit }) => unknown);
 export interface Call {
@@ -82,6 +82,7 @@ export const meeting = (p: Partial<Meeting> = {}): Meeting => ({
   status: "done",
   analysis_status: "done",
   analysis_error: null,
+  summary: null,
   created_at: ISO,
   finished_at: "2026-11-13T10:42:00Z",
   ...p,
@@ -94,7 +95,6 @@ export const progress = (p: Partial<Progress> = {}): Progress => ({
   chunks_done: 2,
   chunks_failed: 0,
   segments: 3,
-  events: 2,
   ...p,
 });
 
@@ -106,26 +106,5 @@ export const segment = (p: Partial<Segment> = {}): Segment => ({
   text: "Hola",
   avg_logprob: -0.2,
   low_confidence: false,
-  ...p,
-});
-
-export const event = (p: Partial<MtEvent> = {}): MtEvent => ({
-  id: 1,
-  requirement_id: null,
-  meeting_id: 1,
-  segment_id: 1,
-  kind: "decision",
-  summary: "Algo decidido",
-  quote: "una cita",
-  timestamp: 0,
-  created_at: ISO,
-  ...p,
-});
-
-export const requirement = (p: Partial<Requirement> = {}): Requirement => ({
-  id: 1,
-  project: "pagos",
-  title: "Método de pago",
-  created_at: ISO,
   ...p,
 });

@@ -14,7 +14,6 @@ import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { Meeting } from "./pages/Meeting";
 import { Record } from "./pages/Record";
-import { Requirements } from "./pages/Requirements";
 import { Search } from "./pages/Search";
 
 const queryClient = new QueryClient({
@@ -61,7 +60,6 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="record" element={<Record />} />
           <Route path="meetings/:id" element={<Meeting />} />
-          <Route path="requirements" element={<Requirements />} />
           <Route path="search" element={<Search />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

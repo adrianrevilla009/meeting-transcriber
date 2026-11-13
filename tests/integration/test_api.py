@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.api import main
 from app.models import AuditLog, Chunk
-from app.services.analyzer import FakeAnalyzer, Item
+from app.services.analyzer import FakeAnalyzer
 from tests.helpers import drain, new_meeting, upload
 
 PROTECTED = [
@@ -16,11 +16,8 @@ PROTECTED = [
     ("get", "/meetings/1/progress"),
     ("post", "/meetings/1/finish"),
     ("get", "/meetings/1/transcript"),
-    ("get", "/meetings/1/events"),
     ("post", "/meetings/1/analyze"),
     ("delete", "/meetings/1"),
-    ("get", "/requirements"),
-    ("get", "/requirements/1/history"),
     ("get", "/search?q=hola"),
     ("get", "/system"),
 ]
@@ -51,8 +48,6 @@ def test_create_and_list_meetings_newest_first_with_project_filter(client):
         "/meetings/999",
         "/meetings/999/progress",
         "/meetings/999/transcript",
-        "/meetings/999/events",
-        "/requirements/999/history",
     ],
 )
 def test_unknown_ids_are_404(client, path):
@@ -143,19 +138,16 @@ def test_delete_removes_audio_and_all_rows(client, env):
     assert client.get("/search", params={"q": "hola"}).json() == []
 
 
-def test_requirements_filter_and_history(client):
-    for project, quote in [("pagos", "pagar con tarjeta"), ("web", "modo oscuro")]:
-        mid = new_meeting(client, project=project)
-        upload(client, mid, 0, f"Queremos {quote} sí o sí.")
-        FakeAnalyzer.script = [Item(kind="new_requirement", requirement=quote.title(), summary=quote, quote=quote)]
-        client.post(f"/meetings/{mid}/finish")
-        drain()
-    reqs = client.get("/requirements").json()
-    assert {r["project"] for r in reqs} == {"pagos", "web"}
-    pagos = client.get("/requirements", params={"project": "pagos"}).json()
-    assert [r["title"] for r in pagos] == ["Pagar Con Tarjeta"]
-    hist = client.get(f"/requirements/{pagos[0]['id']}/history").json()
-    assert hist["requirement"]["id"] == pagos[0]["id"] and len(hist["events"]) == 1
+def test_summary_is_exposed_on_the_meeting(client):
+    mid = new_meeting(client, project="pagos")
+    assert client.get(f"/meetings/{mid}").json()["summary"] is None
+    upload(client, mid, 0, "Queremos pagar con tarjeta sí o sí.")
+    FakeAnalyzer.script = "El cliente exige pago con tarjeta."
+    client.post(f"/meetings/{mid}/finish")
+    drain()
+    m = client.get(f"/meetings/{mid}").json()
+    assert m["analysis_status"] == "done" and m["summary"] == "El cliente exige pago con tarjeta."
+    assert client.get("/meetings", params={"project": "pagos"}).json()[0]["summary"] == m["summary"]
 
 
 def test_progress_counts_by_status(client, session):
@@ -173,7 +165,6 @@ def test_progress_counts_by_status(client, session):
         "chunks_done": 0,
         "chunks_failed": 1,
         "segments": 0,
-        "events": 0,
     }
 
 

@@ -27,7 +27,7 @@ SERVICES := db api worker web ollama
 endif
 
 .PHONY: help start open web-dev test-api test-web test-e2e test-all coverage env check models whisper-model llm-model up down restart logs ps health \
-        ollama-check agent-install record meetings transcript events requirements search test clean
+        ollama-check agent-install record meetings transcript search test clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
@@ -109,14 +109,8 @@ record: ## Graba una reunion: make record TITLE="Kickoff" PROJECT=pagos (Ctrl+C 
 meetings: ## Lista reuniones
 	@curl -s $(AUTH) $(API)/meetings; echo
 
-transcript: ## Transcripcion+analisis en Markdown: make transcript ID=1
+transcript: ## Resumen+transcripcion en Markdown: make transcript ID=1
 	@curl -s $(AUTH) $(API)/meetings/$(ID)/transcript
-
-events: ## Requisitos/decisiones/dudas: make events ID=1
-	@curl -s $(AUTH) $(API)/meetings/$(ID)/events; echo
-
-requirements: ## Requisitos (opcional PROJECT=x)
-	@curl -s $(AUTH) "$(API)/requirements?project=$(PROJECT)"; echo
 
 search: ## Busca en transcripciones: make search Q="texto"
 	@curl -s -G $(AUTH) --data-urlencode "q=$(Q)" $(API)/search; echo

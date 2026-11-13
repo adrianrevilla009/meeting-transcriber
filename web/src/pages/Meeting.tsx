@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,7 +11,6 @@ import {
   Download,
   FileText,
   Mic,
-  Quote,
   RefreshCw,
   Search,
   Square,
@@ -23,19 +22,16 @@ import {
   fmtDate,
   fmtDuration,
   fmtTs,
-  KIND,
   meetingTitle,
   phaseOf,
   slug,
   SPEAKER,
   type Phase,
 } from "../format";
-import type { EventKind, Meeting as MeetingT, MtEvent, Progress, Segment } from "../types";
+import type { Meeting as MeetingT, Progress, Segment } from "../types";
 import { ConfirmButton, Empty, highlight, ProgressBar, ProjectTag, Spinner, StatusPill } from "../components/ui";
 import { useToast } from "../components/Toasts";
 import { useRecorder } from "../recorder/RecorderContext";
-
-const KIND_ORDER: EventKind[] = ["new_requirement", "changed_requirement", "decision", "open_question"];
 
 function Stepper({ phase, progress }: { phase: Phase; progress?: Progress }) {
   const order: Phase[] = ["recording", "transcribing", "analyzing", "ready"];
@@ -47,7 +43,7 @@ function Stepper({ phase, progress }: { phase: Phase; progress?: Progress }) {
       label: "Transcripción",
       detail: progress ? `${progress.chunks_done}/${progress.chunks_total} · ${progress.segments} frases` : "",
     },
-    { label: "Análisis IA", detail: phase === "failed" ? "falló" : progress ? `${progress.events} hallazgos` : "" },
+    { label: "Resumen IA", detail: phase === "failed" ? "falló" : "" },
     { label: "Lista", detail: "" },
   ];
   return (
@@ -151,104 +147,103 @@ function Transcript({ segments, phase, focus }: { segments: Segment[]; phase: Ph
   );
 }
 
-function Insights({
-  meeting,
-  events,
-  loading,
-  phase,
-  reqTitles,
-  onJump,
-}: {
-  meeting: MeetingT;
-  events: MtEvent[];
-  loading: boolean;
-  phase: Phase;
-  reqTitles: Map<number, string>;
-  onJump: (segId: number) => void;
-}) {
-  if (loading || phase === "recording" || phase === "transcribing" || phase === "analyzing") {
+type Block = { type: "p" | "h"; text: string } | { type: "ul"; items: string[] };
+
+/** Párrafos, títulos ("# …") y listas ("- …" o "* …"): lo justo para mostrar el resumen sin dependencias. */
+function parseSummary(text: string): Block[] {
+  const blocks: Block[] = [];
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length) blocks.push({ type: "p", text: para.join(" ") });
+    para = [];
+  };
+  for (const raw of text.split(/?
+/)) {
+    const line = raw.trim();
+    const bullet = /^[-*•]s+(.*)$/.exec(line);
+    const heading = /^#{1,6}s+(.*)$/.exec(line);
+    if (!line) {
+      flush();
+    } else if (bullet) {
+      flush();
+      const last = blocks[blocks.length - 1];
+      if (last?.type === "ul") last.items.push(bullet[1]);
+      else blocks.push({ type: "ul", items: [bullet[1]] });
+    } else if (heading) {
+      flush();
+      blocks.push({ type: "h", text: heading[1] });
+    } else {
+      para.push(line);
+    }
+  }
+  flush();
+  return blocks;
+}
+
+function Summary({ meeting, phase }: { meeting: MeetingT; phase: Phase }) {
+  if (phase === "recording" || phase === "transcribing" || phase === "analyzing") {
     return (
-      <div className="insight-grid">
-        {KIND_ORDER.map((k) => (
-          <div key={k} className="insight-col">
-            <div className="insight-head">
-              <span className={`badge tone-${KIND[k].tone}`}>{KIND[k].plural}</span>
-            </div>
-            <div className="skeleton" />
-            <div className="skeleton short" />
-          </div>
-        ))}
-        <div className="insight-wait muted">
+      <div className="summary-wait">
+        <div className="skeleton" />
+        <div className="skeleton short" />
+        <div className="muted">
           <Brain size={16} />{" "}
-          {loading
-            ? "Cargando el análisis…"
-            : phase === "analyzing"
-              ? "La IA está leyendo la transcripción…"
-              : "El análisis empieza al terminar la transcripción."}
+          {phase === "analyzing"
+            ? "La IA está leyendo la transcripción…"
+            : "El resumen se genera al terminar la transcripción."}
         </div>
       </div>
     );
   }
   if (meeting.analysis_status === "skipped") {
     return (
-      <Empty icon={<Brain size={24} />} title="Análisis desactivado">
+      <Empty icon={<Brain size={24} />} title="Resumen desactivado">
         MT_ANALYZER=none en la configuración.
       </Empty>
     );
   }
-  if (!events.length) {
+  if (meeting.analysis_status === "failed") {
     return (
-      <Empty icon={<Brain size={24} />} title="Sin hallazgos">
-        La IA no encontró requisitos, decisiones ni dudas con cita verificable.
+      <Empty icon={<Brain size={24} />} title="Resumen no disponible">
+        El análisis falló; puedes reintentarlo con «Reanalizar».
+      </Empty>
+    );
+  }
+  if (!meeting.summary?.trim()) {
+    return (
+      <Empty icon={<Brain size={24} />} title="Sin resumen">
+        No hay contenido suficiente en la transcripción para resumir.
       </Empty>
     );
   }
   return (
-    <div className="insight-grid">
-      {KIND_ORDER.map((k) => {
-        const group = events.filter((e) => e.kind === k);
-        return (
-          <div key={k} className="insight-col">
-            <div className="insight-head">
-              <span className={`badge tone-${KIND[k].tone}`}>{KIND[k].plural}</span>
-              <span className="muted small">{group.length}</span>
-            </div>
-            {group.map((e) => (
-              <article key={e.id} className={`insight tone-border-${KIND[k].tone}`}>
-                {e.requirement_id && reqTitles.get(e.requirement_id) && (
-                  <Link to={`/requirements?focus=${e.requirement_id}`} className="insight-req">
-                    {reqTitles.get(e.requirement_id)}
-                  </Link>
-                )}
-                <p>{e.summary}</p>
-                <blockquote>
-                  <Quote size={13} />
-                  {e.quote}
-                </blockquote>
-                {e.segment_id != null && (
-                  <button className="ts-link mono" onClick={() => onJump(e.segment_id!)}>
-                    {fmtTs(e.timestamp)} · ver en la transcripción
-                  </button>
-                )}
-              </article>
+    <div className="summary">
+      {parseSummary(meeting.summary).map((b, i) =>
+        b.type === "ul" ? (
+          <ul key={i}>
+            {b.items.map((it, j) => (
+              <li key={j}>{it}</li>
             ))}
-            {!group.length && <div className="muted small insight-none">—</div>}
-          </div>
-        );
-      })}
+          </ul>
+        ) : b.type === "h" ? (
+          <h3 key={i}>{b.text}</h3>
+        ) : (
+          <p key={i}>{b.text}</p>
+        ),
+      )}
     </div>
   );
 }
 
 export function Meeting() {
   const id = Number(useParams().id);
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const rec = useRecorder();
   const focus = params.get("seg") ? Number(params.get("seg")) : null;
-  const [tab, setTab] = useState<"insights" | "transcript">(focus != null ? "transcript" : "insights");
+  const [tab, setTab] = useState<"summary" | "transcript">(focus != null ? "transcript" : "summary");
   const [copied, setCopied] = useState(false);
 
   const meetingQ = useQuery({
@@ -275,22 +270,13 @@ export function Meeting() {
     enabled: !!m,
     refetchInterval: phase === "recording" || phase === "transcribing" ? 4000 : false,
   });
-  const eventsQ = useQuery({ queryKey: ["events", id], queryFn: () => api.events(id), enabled: !!m });
-  const reqsQ = useQuery({
-    queryKey: ["requirements", m?.project ?? ""],
-    queryFn: () => api.requirements(m?.project || undefined),
-    enabled: !!m,
-  });
 
   // Al cambiar de fase, refresca lo que depende de ella.
   useEffect(() => {
     if (!phase) return;
     void qc.invalidateQueries({ queryKey: ["segments", id] });
-    void qc.invalidateQueries({ queryKey: ["events", id] });
     void qc.invalidateQueries({ queryKey: ["meetings"] });
   }, [phase, id, qc]);
-
-  const reqTitles = useMemo(() => new Map((reqsQ.data ?? []).map((r) => [r.id, r.title])), [reqsQ.data]);
 
   if (meetingQ.isLoading)
     return (
@@ -314,10 +300,6 @@ export function Meeting() {
   const duration = fmtDuration(m.created_at, m.finished_at);
   const recordingHere = rec.meeting?.id === m.id;
 
-  const jump = (segId: number) => {
-    setTab("transcript");
-    setParams({ seg: String(segId) }, { replace: true });
-  };
   const download = async () => downloadText(`${slug(title)}.md`, await api.markdown(m.id));
   const copy = async () => {
     await navigator.clipboard.writeText(await api.markdown(m.id));
@@ -417,9 +399,8 @@ export function Meeting() {
       <Stepper phase={phase} progress={progressQ.data} />
 
       <div className="tabs">
-        <button className={`tab ${tab === "insights" ? "active" : ""}`} onClick={() => setTab("insights")}>
-          <Brain size={16} /> Análisis IA
-          {eventsQ.data && eventsQ.data.length > 0 && <span className="tab-count">{eventsQ.data.length}</span>}
+        <button className={`tab ${tab === "summary" ? "active" : ""}`} onClick={() => setTab("summary")}>
+          <Brain size={16} /> Resumen
         </button>
         <button className={`tab ${tab === "transcript" ? "active" : ""}`} onClick={() => setTab("transcript")}>
           <FileText size={16} /> Transcripción
@@ -428,15 +409,8 @@ export function Meeting() {
       </div>
 
       <div className="glass tab-panel">
-        {tab === "insights" ? (
-          <Insights
-            meeting={m}
-            events={eventsQ.data ?? []}
-            loading={eventsQ.isLoading}
-            phase={phase}
-            reqTitles={reqTitles}
-            onJump={jump}
-          />
+        {tab === "summary" ? (
+          <Summary meeting={m} phase={phase} />
         ) : (
           <Transcript segments={segmentsQ.data ?? []} phase={phase} focus={focus} />
         )}

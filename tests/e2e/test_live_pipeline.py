@@ -8,13 +8,13 @@ guion exacto está en speech_es.txt, así que se puede medir el WER real de Whis
 """
 
 import os
+import re
 import time
+import unicodedata
 from pathlib import Path
 
 import httpx
 import pytest
-
-from app.services.verifier import normalize
 
 pytestmark = pytest.mark.e2e
 
@@ -34,6 +34,13 @@ def _token() -> str:
             if line.startswith("MT_API_TOKEN="):
                 return line.split("=", 1)[1].strip()
     pytest.skip("Sin MT_API_TOKEN ni .env")
+
+
+def normalize(text: str) -> str:
+    """Minúsculas, sin tildes ni puntuación."""
+    text = unicodedata.normalize("NFD", text.lower())
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", text)).strip()
 
 
 def wer(reference: str, hypothesis: str) -> float:
@@ -120,30 +127,17 @@ def test_offsets_and_speakers_are_preserved(api, processed):
     assert [s["start"] for s in segs] == sorted(s["start"] for s in segs)
 
 
-def test_llm_findings_are_grounded_in_the_transcript(api, processed):
+def test_llm_summary_covers_the_meeting(api, processed):
     if processed["meeting"]["analysis_status"] == "skipped":
         pytest.skip("Análisis desactivado")
-    events = api.get(f"/meetings/{processed['id']}/events").json()
-    segs = {s["id"]: s for s in api.get(f"/meetings/{processed['id']}/transcript", params={"format": "json"}).json()}
-    assert events, "El LLM no extrajo nada de un audio con requisito, decisión y duda explícitos"
-    for e in events:
-        seg = segs[e["segment_id"]]
-        assert e["timestamp"] == seg["start"]
-        assert e["kind"] in {"new_requirement", "changed_requirement", "decision", "open_question"}
-        assert len(normalize(e["quote"])) >= 8
-    kinds = {e["kind"] for e in events}
-    assert kinds & {"new_requirement", "decision"}, f"Esperaba al menos un requisito o decisión, hubo {kinds}"
+    summary = api.get(f"/meetings/{processed['id']}").json()["summary"]
+    assert summary and len(summary) >= 80, "El LLM no generó un resumen de un audio con contenido explícito"
+    assert "tarjeta" in normalize(summary), f"El resumen omite un dato clave del audio: {summary!r}"
 
 
-def test_requirements_and_search_reflect_the_meeting(api, processed):
-    mid = processed["id"]
+def test_search_reflects_the_meeting(api, processed):
     hits = api.get("/search", params={"q": "tarjeta"}).json()
-    assert any(h["meeting_id"] == mid for h in hits)
-    if processed["meeting"]["analysis_status"] == "done":
-        reqs = api.get("/requirements", params={"project": "__e2e__"}).json()
-        events = api.get(f"/meetings/{mid}/events").json()
-        if any(e["requirement_id"] for e in events):
-            assert reqs
+    assert any(h["meeting_id"] == processed["id"] for h in hits)
 
 
 def test_markdown_export(api, processed):

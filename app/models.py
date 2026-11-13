@@ -35,10 +35,10 @@ class Meeting(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     analysis_status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|done|failed|skipped
     analysis_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     chunks: Mapped[list["Chunk"]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
     segments: Mapped[list["Segment"]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
-    events: Mapped[list["RequirementEvent"]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
 
 
 class Chunk(Base):
@@ -77,42 +77,6 @@ class Segment(Base):
     low_confidence: Mapped[bool] = mapped_column(default=False)
 
     meeting: Mapped[Meeting] = relationship(back_populates="segments")
-
-
-class Requirement(Base):
-    """Requisito, decisión o duda que evoluciona entre reuniones."""
-
-    __tablename__ = "requirements"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project: Mapped[str] = mapped_column(String(100), default="", index=True)
-    title: Mapped[str] = mapped_column(String(300))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    events: Mapped[list["RequirementEvent"]] = relationship(
-        back_populates="requirement", cascade="all, delete-orphan", order_by="RequirementEvent.id"
-    )
-
-
-class RequirementEvent(Base):
-    """Cada mención/cambio de un requisito, con su cita literal y el segmento de origen."""
-
-    __tablename__ = "requirement_events"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    requirement_id: Mapped[int | None] = mapped_column(
-        ForeignKey("requirements.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
-    segment_id: Mapped[int | None] = mapped_column(ForeignKey("segments.id", ondelete="SET NULL"), nullable=True)
-    kind: Mapped[str] = mapped_column(String(30))  # new_requirement|changed_requirement|decision|open_question
-    summary: Mapped[str] = mapped_column(Text)
-    quote: Mapped[str] = mapped_column(Text)
-    timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)  # seg. desde inicio de reunión
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    requirement: Mapped[Requirement | None] = relationship(back_populates="events")
-    meeting: Mapped[Meeting] = relationship(back_populates="events")
 
 
 class AuditLog(Base):

@@ -51,9 +51,9 @@ def session(env):
 
 @pytest.fixture(autouse=True)
 def _reset_fake_analyzer():
-    FakeAnalyzer.script = []
+    FakeAnalyzer.script = ""
     yield
-    FakeAnalyzer.script = []
+    FakeAnalyzer.script = ""
 
 
 @pytest.fixture

@@ -4,15 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Meeting, RequirementEvent, Segment
+from app.models import Meeting, Segment
 
 LABELS = {"mic": "Yo", "system": "Otros"}
-KIND_TITLES = {
-    "new_requirement": "Requisitos nuevos",
-    "changed_requirement": "Cambios de requisitos",
-    "decision": "Decisiones",
-    "open_question": "Dudas abiertas",
-}
 
 
 def fmt_ts(seconds: float) -> str:
@@ -24,10 +18,6 @@ def render_markdown(session: Session, meeting: Meeting) -> str:
     segments = session.scalars(
         select(Segment).where(Segment.meeting_id == meeting.id).order_by(Segment.start, Segment.id)
     ).all()
-    events = session.scalars(
-        select(RequirementEvent).where(RequirementEvent.meeting_id == meeting.id).order_by(RequirementEvent.id)
-    ).all()
-
     lines = [
         f"# {meeting.title or 'Reunión ' + str(meeting.id)}",
         "",
@@ -36,18 +26,8 @@ def render_markdown(session: Session, meeting: Meeting) -> str:
         f"- Segmentos marcados `[?]` (baja confianza): {sum(1 for s in segments if s.low_confidence)}",
         "",
     ]
-    if events:
-        lines += ["## Análisis (citas verificadas contra la transcripción)", ""]
-        for kind, title in KIND_TITLES.items():
-            group = [e for e in events if e.kind == kind]
-            if not group:
-                continue
-            lines += [f"### {title}", ""]
-            for e in group:
-                name = f"**{e.requirement.title}** — " if e.requirement else ""
-                lines.append(f"- {name}{e.summary} (`{fmt_ts(e.timestamp or 0)}`)")
-                lines.append(f"  > {e.quote}")
-            lines.append("")
+    if meeting.summary:
+        lines += ["## Resumen", "", meeting.summary, ""]
     lines += ["## Transcripción", ""]
     for seg in segments:
         who = LABELS.get(seg.source, "")

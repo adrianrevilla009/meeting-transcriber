@@ -33,13 +33,9 @@ describe("api client", () => {
   });
 
   it("encodes query parameters", async () => {
-    const calls = mockApi({ "GET /search": [], "GET /requirements": [] });
+    const calls = mockApi({ "GET /search": [] });
     await api.search("pago & cobro");
-    await api.requirements("mi proyecto");
-    expect(calls.map((c) => c.path)).toEqual([
-      "/search?q=pago%20%26%20cobro&limit=100",
-      "/requirements?project=mi%20proyecto",
-    ]);
+    expect(calls.map((c) => c.path)).toEqual(["/search?q=pago%20%26%20cobro&limit=100"]);
   });
 
   it("401 broadcasts mt:unauthorized", async () => {

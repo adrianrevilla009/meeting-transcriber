@@ -64,7 +64,7 @@ test("sidebar shows the system status", async ({ page }) => {
   await expect(card.locator(".dot-ok")).toHaveCount(2); // API + LLM listos
 });
 
-test("record from the browser → Whisper → LLM → insights, search and delete", async ({ page }) => {
+test("record from the browser → Whisper → LLM → summary, search and delete", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const title = `e2e navegador ${Date.now()}`;
   await loggedIn(page);
@@ -88,9 +88,9 @@ test("record from the browser → Whisper → LLM → insights, search and delet
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page.locator(".pill-ready")).toBeVisible({ timeout: 6 * 60_000 });
 
-  // 3. Análisis con IA: hallazgos con cita.
-  await expect(page.locator(".insight").first()).toBeVisible();
-  await expect(page.locator(".insight blockquote").first()).not.toBeEmpty();
+  // 3. Resumen con IA: texto con el contenido de la reunión.
+  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".summary")).not.toBeEmpty();
 
   // 4. Transcripción: la voz grabada aparece como "Yo".
   await page.getByRole("button", { name: /Transcripción/ }).click();
@@ -98,47 +98,29 @@ test("record from the browser → Whisper → LLM → insights, search and delet
   await expect(page.locator(".chat")).toContainText(/tarjeta/i);
   await expect(page.locator(".chat")).toContainText(/bizum/i);
 
-  // 5. El salto desde un hallazgo resalta la frase.
-  await page.getByRole("button", { name: /Análisis IA/ }).click();
-  await page.locator(".ts-link").first().click();
-  await expect(page).toHaveURL(/\?seg=\d+/);
-  await expect(page.locator(".bubble-row.flash")).toHaveCount(1);
   const meetingUrl = page.url().split("?")[0];
 
-  // 6. Buscar la frase en todas las reuniones lleva de vuelta a ella.
+  // 5. Buscar la frase en todas las reuniones lleva de vuelta a ella y la resalta.
   await page.getByRole("navigation").getByRole("link", { name: "Buscar" }).click();
   await page.getByPlaceholder(/presupuesto/).fill("tarjeta");
   const group = page.locator(".search-group", { hasText: title });
   await expect(group).toBeVisible();
   await group.locator(".search-hit").first().click();
   await expect(page).toHaveURL(new RegExp(`${meetingUrl.split("/").pop()}\\?seg=`));
+  await expect(page.locator(".bubble-row.flash")).toHaveCount(1);
 
-  // 7. Aparece en el panel con su proyecto.
+  // 6. Aparece en el panel con su proyecto.
   await page.getByRole("navigation").getByRole("link", { name: "Reuniones" }).click();
   await page.getByRole("button", { name: `#${PROJECT}` }).click();
   await expect(page.locator(".meeting-card", { hasText: title })).toContainText("Lista");
 
-  // 8. Borrar exige confirmación y elimina la reunión.
+  // 7. Borrar exige confirmación y elimina la reunión.
   await page.locator(".meeting-card", { hasText: title }).click();
   await page.getByRole("button", { name: /Eliminar/ }).click();
   await page.getByRole("button", { name: /Seguro/ }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("Reunión eliminada")).toBeVisible();
   await expect(page.locator(".meeting-card", { hasText: title })).toHaveCount(0);
-});
-
-test("requirements page loads and expands a requirement", async ({ page, request }) => {
-  await loggedIn(page);
-  const reqs = await (await request.get("/api/requirements", { headers: auth })).json();
-  await page.goto("/requirements");
-  if (!reqs.length) {
-    await expect(page.getByText("Todavía no hay requisitos")).toBeVisible();
-    return;
-  }
-  const first = page.locator(".req-head").first();
-  await first.click();
-  await expect(first).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator(".timeline-item").first()).toBeVisible();
 });
 
 test("unknown routes fall back to the dashboard", async ({ page }) => {

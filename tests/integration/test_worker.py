@@ -4,8 +4,8 @@ from datetime import timedelta
 
 from sqlalchemy import select
 
-from app.models import Chunk, Meeting, Requirement, RequirementEvent, Segment, utcnow
-from app.services.analyzer import FakeAnalyzer, Item
+from app.models import Chunk, Meeting, Segment, utcnow
+from app.services.analyzer import FakeAnalyzer
 from app.workers import worker
 from app.workers.worker import run_once
 from tests.helpers import drain, new_meeting, upload
@@ -64,7 +64,7 @@ def test_analysis_failure_marks_meeting_but_keeps_transcript(client, env, monkey
     def explode(self, window):
         raise RuntimeError("Ollama caído")
 
-    monkeypatch.setattr(FakeAnalyzer, "extract", explode)
+    monkeypatch.setattr(FakeAnalyzer, "summarize", explode)
     mid = new_meeting(client)
     upload(client, mid, 0, "hola a todos")
     client.post(f"/meetings/{mid}/finish")
@@ -100,107 +100,40 @@ def test_retention_keeps_audio_then_purges_it(client, env, set_env, session):
     assert chunk.path is None and not any((env / "audio").rglob("*.txt"))
 
 
-def test_reanalysis_replaces_previous_events(client, session):
+def test_reanalysis_replaces_previous_summary(client):
     mid = new_meeting(client, project="p")
     upload(client, mid, 0, "Decidimos usar Postgres para todo.")
-    FakeAnalyzer.script = [Item(kind="decision", requirement="BD", summary="Postgres", quote="usar Postgres para todo")]
+    FakeAnalyzer.script = "Se decide usar Postgres."
     client.post(f"/meetings/{mid}/finish")
     drain()
-    assert len(client.get(f"/meetings/{mid}/events").json()) == 1
+    assert client.get(f"/meetings/{mid}").json()["summary"] == "Se decide usar Postgres."
 
-    FakeAnalyzer.script = [
-        Item(kind="decision", requirement="BD", summary="Postgres", quote="usar Postgres para todo"),
-        Item(kind="open_question", summary="¿Y MySQL?", quote="Decidimos usar Postgres"),
-    ]
+    FakeAnalyzer.script = "Se decide usar Postgres y se descarta MySQL."
     assert client.post(f"/meetings/{mid}/analyze").json()["analysis_status"] == "pending"
     drain()
-    events = client.get(f"/meetings/{mid}/events").json()
-    assert sorted(e["kind"] for e in events) == ["decision", "open_question"]
-    assert session.query(RequirementEvent).count() == 2
+    m = client.get(f"/meetings/{mid}").json()
+    assert m["analysis_status"] == "done" and m["summary"] == "Se decide usar Postgres y se descarta MySQL."
 
 
-class TestAnalysisRules:
-    """Reglas de aceptación del análisis aplicadas sobre la BD."""
-
-    def _run(self, client, text, items, project="p"):
-        mid = new_meeting(client, project=project)
-        upload(client, mid, 0, text)
-        FakeAnalyzer.script = items
-        client.post(f"/meetings/{mid}/finish")
-        drain()
-        return mid, client.get(f"/meetings/{mid}/events").json()
-
-    def test_unknown_kind_is_rejected(self, client):
-        _, events = self._run(
-            client,
-            "Hay que migrar la base de datos.",
-            [Item(kind="chiste", summary="x", quote="migrar la base de datos")],
-        )
-        assert events == []
-
-    def test_duplicates_from_overlapping_windows_are_collapsed(self, client):
-        item = Item(kind="decision", requirement="Migración", summary="Migrar la BD", quote="migrar la base de datos")
-        _, events = self._run(client, "Hay que migrar la base de datos.", [item, item])
-        assert len(events) == 1
-
-    def test_event_points_to_the_segment_and_time_of_the_quote(self, client):
-        text = "Buenos días.\nRepaso rápido.\nHay que migrar la base de datos."
-        _, events = self._run(client, text, [Item(kind="decision", summary="Migrar", quote="migrar la base de datos")])
-        assert events[0]["timestamp"] == 10.0  # tercer segmento (FakeTranscriber: 5 s por línea)
-
-    def test_open_questions_do_not_create_requirements(self, client, session):
-        self._run(
-            client,
-            "¿Necesitamos soporte para dólares?",
-            [Item(kind="open_question", requirement="Divisas", summary="Dólares", quote="soporte para dólares")],
-        )
-        assert session.query(Requirement).count() == 0
-
-    def test_similar_requirement_names_merge_within_project_only(self, client, session):
-        t = "Queremos pagar con tarjeta."
-        self._run(
-            client,
-            t,
-            [Item(kind="new_requirement", requirement="Método de pago", summary="a", quote="pagar con tarjeta")],
-            project="pagos",
-        )
-        self._run(
-            client,
-            t,
-            [Item(kind="changed_requirement", requirement="metodo de pago", summary="b", quote="pagar con tarjeta")],
-            project="pagos",
-        )
-        self._run(
-            client,
-            t,
-            [Item(kind="new_requirement", requirement="Método de pago", summary="c", quote="pagar con tarjeta")],
-            project="otro",
-        )
-        reqs = session.scalars(select(Requirement).order_by(Requirement.id)).all()
-        assert [(r.project, len(r.events)) for r in reqs] == [("pagos", 2), ("otro", 1)]
-
-    def test_different_requirements_stay_separate(self, client, session):
-        text = "Queremos pagar con tarjeta.\nY un modo oscuro en la web."
-        self._run(
-            client,
-            text,
-            [
-                Item(kind="new_requirement", requirement="Método de pago", summary="a", quote="pagar con tarjeta"),
-                Item(kind="new_requirement", requirement="Modo oscuro", summary="b", quote="un modo oscuro en la web"),
-            ],
-        )
-        assert session.query(Requirement).count() == 2
+def test_empty_transcript_gives_done_without_summary(client):
+    mid = new_meeting(client)
+    client.post(f"/meetings/{mid}/finish")
+    drain()
+    m = client.get(f"/meetings/{mid}").json()
+    assert m["analysis_status"] == "done" and m["summary"] is None
 
 
-def test_long_meeting_is_analyzed_in_several_windows(client, set_env, monkeypatch):
+def test_long_meeting_is_summarized_by_windows_and_merged(client, set_env, monkeypatch):
     set_env("MT_ANALYSIS_WINDOW_CHARS", "60")
     seen = []
-    monkeypatch.setattr(FakeAnalyzer, "extract", lambda self, w: seen.append(w) or [])
+    monkeypatch.setattr(FakeAnalyzer, "summarize", lambda self, w: seen.append(w) or f"parte {len(seen)}")
     mid = new_meeting(client)
     upload(client, mid, 0, "\n".join(f"frase número {i} de la reunión" for i in range(10)))
     client.post(f"/meetings/{mid}/finish")
     drain()
     assert len(seen) > 2
+    summary = client.get(f"/meetings/{mid}").json()["summary"]
+    assert all(f"parte {i}" in summary for i in range(1, len(seen) + 1))  # el resumen final reúne todas las partes
 
 
 def test_segments_store_confidence_metrics(client, session):
@@ -235,7 +168,7 @@ def test_meeting_deleted_while_analysis_fails_does_not_crash_worker(client, monk
             s.commit()
         raise RuntimeError("Ollama caído")
 
-    monkeypatch.setattr(FakeAnalyzer, "extract", delete_then_fail)
+    monkeypatch.setattr(FakeAnalyzer, "summarize", delete_then_fail)
     mid = new_meeting(client)
     upload(client, mid, 0, "hola")
     client.post(f"/meetings/{mid}/finish")

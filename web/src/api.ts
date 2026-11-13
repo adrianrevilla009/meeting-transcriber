@@ -1,13 +1,4 @@
-import type {
-  Meeting,
-  MtEvent,
-  Progress,
-  Requirement,
-  RequirementHistory,
-  SearchHit,
-  Segment,
-  SystemInfo,
-} from "./types";
+import type { Meeting, Progress, SearchHit, Segment, SystemInfo } from "./types";
 
 const BASE = "/api";
 const TOKEN_KEY = "mt_token";
@@ -94,10 +85,5 @@ export const api = {
 
   segments: (id: number) => request<Segment[]>(`/meetings/${id}/transcript?format=json`),
   markdown: (id: number) => request<string>(`/meetings/${id}/transcript?format=md`),
-  events: (id: number) => request<MtEvent[]>(`/meetings/${id}/events`),
-
-  requirements: (project?: string) =>
-    request<Requirement[]>(`/requirements${project ? `?project=${encodeURIComponent(project)}` : ""}`),
-  history: (id: number) => request<RequirementHistory>(`/requirements/${id}/history`),
   search: (q: string) => request<SearchHit[]>(`/search?q=${encodeURIComponent(q)}&limit=100`),
 };

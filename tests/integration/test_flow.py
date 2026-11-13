@@ -1,4 +1,4 @@
-from app.services.analyzer import FakeAnalyzer, Item
+from app.services.analyzer import FakeAnalyzer
 from tests.helpers import drain, upload
 
 
@@ -12,54 +12,28 @@ def test_auth_required(env):
         assert c.get("/health").status_code == 200
 
 
-def test_full_flow_with_verified_citations_and_history(client, env):
-    # Reunión 1: requisito nuevo
+def test_full_flow_generates_summary_and_exports_it(client, env):
     m1 = client.post("/meetings", json={"title": "Kickoff", "project": "pagos"}).json()["id"]
     upload(client, m1, 0, "El cliente quiere que el pago se haga solo con tarjeta.")
-    FakeAnalyzer.script = [
-        Item(
-            kind="new_requirement",
-            requirement="Método de pago",
-            summary="Solo tarjeta",
-            quote="el pago se haga solo con tarjeta",
-        )
-    ]
+    FakeAnalyzer.script = "El cliente quiere pagos solo con tarjeta."
     assert client.post(f"/meetings/{m1}/finish").status_code == 200
     drain()
 
-    # Reunión 2: cambio + una cita inventada que debe rechazarse
     m2 = client.post("/meetings", json={"title": "Revisión", "project": "pagos"}).json()["id"]
     upload(client, m2, 0, "Ahora también aceptamos Bizum para el pago.\n?esto se oyó muy mal")
-    FakeAnalyzer.script = [
-        Item(
-            kind="changed_requirement",
-            requirement="Método de pago",
-            summary="Se añade Bizum",
-            quote="también aceptamos Bizum para el pago",
-        ),
-        Item(
-            kind="decision",
-            requirement="Método de pago",
-            summary="Alucinación",
-            quote="esta frase nunca se dijo en la reunión",
-        ),
-    ]
+    FakeAnalyzer.script = "Se añade Bizum como método de pago."
     client.post(f"/meetings/{m2}/finish")
     drain()
 
-    assert client.get(f"/meetings/{m1}").json()["status"] == "done"
-    events2 = client.get(f"/meetings/{m2}/events").json()
-    assert len(events2) == 1  # la cita inventada se rechazó
-    assert events2[0]["kind"] == "changed_requirement"
-
-    reqs = client.get("/requirements", params={"project": "pagos"}).json()
-    assert len(reqs) == 1  # ambas reuniones unidas al mismo requisito
-    hist = client.get(f"/requirements/{reqs[0]['id']}/history").json()
-    assert [e["meeting_id"] for e in hist["events"]] == [m1, m2]
+    one, two = (client.get(f"/meetings/{m}").json() for m in (m1, m2))
+    assert one["status"] == two["status"] == "done"
+    assert one["summary"] == "El cliente quiere pagos solo con tarjeta."
+    assert two["summary"] == "Se añade Bizum como método de pago."
 
     md = client.get(f"/meetings/{m2}/transcript").text
-    assert "[?]" in md and "Bizum" in md
-    assert (env / "exports" / f"meeting_{m2}.md").exists()
+    assert "[?]" in md and "Bizum" in md and "## Resumen" in md
+    exported = (env / "exports" / f"meeting_{m2}.md").read_text(encoding="utf-8")
+    assert "Se añade Bizum como método de pago." in exported
 
     hits = client.get("/search", params={"q": "bizum"}).json()
     assert hits and hits[0]["meeting_id"] == m2
@@ -100,7 +74,7 @@ def test_progress_and_system(client, env):
     assert p["chunks_total"] == 2 and p["chunks_pending"] == 2 and p["segments"] == 0
     assert client.get("/system").json()["queue"] == 2
 
-    FakeAnalyzer.script = []
+    FakeAnalyzer.script = ""
     client.post(f"/meetings/{mid}/finish")
     drain()
     p = client.get(f"/meetings/{mid}/progress").json()
