@@ -12,6 +12,7 @@ export MSYS_NO_PATHCONV := 1
 
 OLLAMA       ?= host
 API          ?= http://127.0.0.1:8000
+PYTHON       ?= $(shell command -v py >/dev/null 2>&1 && echo py || echo python)
 WHISPER      := $(or $(MT_WHISPER_MODEL),small)
 LLM          := $(or $(MT_OLLAMA_MODEL),qwen2.5:7b)
 AUTH         := -H "Authorization: Bearer $(MT_API_TOKEN)"
@@ -93,10 +94,10 @@ ollama-check: ## Verifica que el worker alcanza Ollama y el modelo existe
 	 || echo "AVISO: el worker no llega a Ollama. En modo host prueba a definir OLLAMA_HOST=0.0.0.0 en Windows y reinicia Ollama."
 
 agent-install: ## Instala dependencias del agente de captura (Windows)
-	python -m pip install PyAudioWPatch numpy soundfile requests
+	$(PYTHON) -m pip install PyAudioWPatch numpy soundfile requests
 
 record: ## Graba una reunion: make record TITLE="Kickoff" PROJECT=pagos (Ctrl+C para terminar)
-	python agent/capture_agent.py --api $(API) --token "$(MT_API_TOKEN)" --title "$(TITLE)" --project "$(PROJECT)"
+	$(PYTHON) agent/capture_agent.py --api $(API) --token "$(MT_API_TOKEN)" --title "$(TITLE)" --project "$(PROJECT)"
 
 meetings: ## Lista reuniones
 	@curl -s $(AUTH) $(API)/meetings; echo
@@ -114,7 +115,7 @@ search: ## Busca en transcripciones: make search Q="texto"
 	@curl -s -G $(AUTH) --data-urlencode "q=$(Q)" $(API)/search; echo
 
 test: ## Ejecuta los tests en local
-	python -m pytest
+	$(PYTHON) -m pytest
 
 clean: ## BORRA contenedores y volumenes (BD, audio, modelos Whisper): make clean CONFIRM=yes
 	@[ "$(CONFIRM)" = "yes" ] || { echo "Esto borra todos los datos. Repite con CONFIRM=yes"; exit 1; }
