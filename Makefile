@@ -18,6 +18,10 @@ WHISPER      := $(or $(MT_WHISPER_MODEL),small)
 LLM          := $(or $(MT_OLLAMA_MODEL),qwen2.5:7b)
 AUTH         := -H "Authorization: Bearer $(MT_API_TOKEN)"
 
+# Se usa en linea (no con un make recursivo): en Windows el sub-make puede no encontrar sh.
+HEALTH_CHECK = for i in $$(seq 1 30); do curl -sf $(API)/health >/dev/null && { echo "OK: API viva en $(API)"; exit 0; }; sleep 2; done; \
+	 echo "La API no responde; mira: make logs"; exit 1
+
 ifeq ($(OLLAMA),host)
 COMPOSE  := docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml
 SERVICES := db api worker web
@@ -79,7 +83,7 @@ endif
 
 up: ## Construye y arranca los servicios y espera a /health
 	@$(COMPOSE) up -d --build $(SERVICES)
-	@"$(MAKE)" --no-print-directory health
+	@$(HEALTH_CHECK)
 
 down: ## Para los servicios (conserva datos y modelos)
 	@docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml down
@@ -93,8 +97,7 @@ ps: ## Estado de los contenedores
 	@$(COMPOSE) ps
 
 health: ## Espera a que la API responda
-	@for i in $$(seq 1 30); do curl -sf $(API)/health >/dev/null && { echo "OK: API viva en $(API)"; exit 0; }; sleep 2; done; \
-	 echo "La API no responde; mira: make logs"; exit 1
+	@$(HEALTH_CHECK)
 
 ollama-check: ## Verifica que el worker alcanza Ollama y el modelo existe
 	@$(COMPOSE) exec -T worker python -c "import httpx,os; u=os.environ['MT_OLLAMA_URL']; m=[x['name'] for x in httpx.get(u+'/api/tags',timeout=5).json()['models']]; print('OK: worker ->', u, '| modelos:', ', '.join(m))" \
