@@ -71,7 +71,7 @@ endif
 
 up: ## Construye y arranca los servicios y espera a /health
 	@$(COMPOSE) up -d --build $(SERVICES)
-	@$(MAKE) --no-print-directory health
+	@"$(MAKE)" --no-print-directory health
 
 down: ## Para los servicios (conserva datos y modelos)
 	@docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml down
