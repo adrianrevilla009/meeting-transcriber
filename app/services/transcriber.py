@@ -33,9 +33,7 @@ class FasterWhisperTranscriber:
             download_root=str(settings.whisper_models_dir),
             local_files_only=True,  # el modelo se descarga aparte (make models); nunca en caliente
         )
-        self.prompt = (
-            f"Reunión técnica de negocio. Términos: {settings.glossary}." if settings.glossary else None
-        )
+        self.prompt = f"Reunión técnica de negocio. Términos: {settings.glossary}." if settings.glossary else None
 
     def transcribe(self, path: Path) -> list[RawSegment]:
         segments, _info = self.model.transcribe(
@@ -62,7 +60,7 @@ class FakeTranscriber:
         except (UnicodeDecodeError, OSError):
             text = "texto de prueba"
         out, t = [], 0.0
-        for line in [l for l in text.splitlines() if l.strip()]:
+        for line in [ln for ln in text.splitlines() if ln.strip()]:
             lp = -0.2
             if line.startswith("?"):
                 line, lp = line[1:].strip(), -1.5

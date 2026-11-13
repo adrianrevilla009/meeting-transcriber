@@ -1,0 +1,3 @@
+ignored:
+  # `pip install ".[whisper]"` instala el propio proyecto: las versiones las acota pyproject.toml.
+  - DL3013

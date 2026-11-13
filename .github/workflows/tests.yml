@@ -1,11 +1,36 @@
-name: tests
+name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
+  api-quality:
+    name: API (lint, tipos, seguridad)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+        continue-on-error: true # informativo hasta que se formatee todo el código
+      - run: mypy
+      - run: bandit -q -r app -c pyproject.toml
+      - run: pip-audit
+        continue-on-error: true # depende de avisos externos; no debe bloquear
+
   api:
     name: API (unit + integración)
     runs-on: ubuntu-latest
@@ -19,7 +44,7 @@ jobs:
       - run: pytest --cov=app --cov-report=term-missing
 
   web:
-    name: Web (tipos, build, unit + componentes)
+    name: Web (lint, tipos, build, tests)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,8 +57,38 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
       - run: npm run build
       - run: npm test
+
+  docker:
+    name: Docker (hadolint + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          config: .hadolint.yaml
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: web/Dockerfile
+          config: .hadolint.yaml
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          push: false
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
 # Los e2e (pytest -m e2e y Playwright) necesitan Whisper y Ollama con modelos de varios GB:
 # se ejecutan en local con `make test-e2e`.

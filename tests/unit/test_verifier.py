@@ -1,4 +1,5 @@
 """Verificación de citas: la barrera contra las alucinaciones del LLM."""
+
 import pytest
 
 from app.models import Segment

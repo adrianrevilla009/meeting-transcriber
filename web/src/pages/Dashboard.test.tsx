@@ -25,7 +25,8 @@ describe("Dashboard", () => {
     renderApp(<Dashboard />);
     const grid = await screen.findByText("Revisión sprint");
     expect(grid).toBeInTheDocument();
-    const stat = (label: string) => screen.getByText(label, { selector: ".stat .small" }).previousElementSibling?.textContent;
+    const stat = (label: string) =>
+      screen.getByText(label, { selector: ".stat .small" }).previousElementSibling?.textContent;
     expect(stat("Reuniones")).toBe("3");
     expect(stat("En proceso")).toBe("2");
     expect(stat("Requisitos")).toBe("2");
@@ -78,7 +79,10 @@ describe("Dashboard", () => {
   });
 
   it("shows API errors", async () => {
-    mockApi({ "GET /meetings": new Response(JSON.stringify({ detail: "BD caída" }), { status: 500 }), "GET /requirements": [] });
+    mockApi({
+      "GET /meetings": new Response(JSON.stringify({ detail: "BD caída" }), { status: 500 }),
+      "GET /requirements": [],
+    });
     renderApp(<Dashboard />);
     expect(await screen.findByText("BD caída")).toBeInTheDocument();
   });

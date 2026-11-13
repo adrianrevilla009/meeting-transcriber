@@ -1,4 +1,5 @@
 """Worker: transcribe trozos pendientes, finaliza reuniones, analiza y exporta .md."""
+
 import logging
 import time
 from pathlib import Path
@@ -35,6 +36,8 @@ def claim_chunk(session: Session) -> Chunk | None:
 def process_chunk(session: Session, chunk: Chunk) -> None:
     s = get_settings()
     try:
+        if chunk.path is None:
+            raise RuntimeError("El audio del trozo ya no existe")
         segs = get_transcriber().transcribe(Path(chunk.path))
         for r in segs:
             low = (r.avg_logprob is not None and r.avg_logprob < s.min_avg_logprob) or (
@@ -58,7 +61,7 @@ def process_chunk(session: Session, chunk: Chunk) -> None:
         if s.audio_retention_days <= 0:
             delete_audio(chunk.path)
             chunk.path = None
-    except Exception as exc:  # noqa: BLE001 - el audio se conserva para reintentar
+    except Exception as exc:
         log.exception("Fallo transcribiendo trozo %s", chunk.id)
         chunk.status = ChunkStatus.failed
         chunk.error = str(exc)[:500]
@@ -79,12 +82,16 @@ def finalize_ready_meetings(session: Session) -> int:
         m.status = MeetingStatus.done
         session.commit()
         export_meeting(session, m)  # transcripción disponible aunque falle el LLM
+        meeting_id = m.id  # tras un rollback, leer m.id recarga la fila (y falla si se borró)
         try:
             analyze_meeting(session, m)
-        except Exception as exc:  # noqa: BLE001
-            log.exception("Fallo en el análisis de la reunión %s", m.id)
+        except Exception as exc:
+            log.exception("Fallo en el análisis de la reunión %s", meeting_id)
             session.rollback()
-            m = session.get(Meeting, m.id)
+            fresh = session.get(Meeting, meeting_id)
+            if fresh is None:  # se borró la reunión mientras se analizaba
+                continue
+            m = fresh
             m.analysis_status = "failed"
             m.analysis_error = str(exc)[:500]
             session.commit()

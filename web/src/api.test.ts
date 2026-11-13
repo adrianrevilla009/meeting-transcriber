@@ -36,7 +36,10 @@ describe("api client", () => {
     const calls = mockApi({ "GET /search": [], "GET /requirements": [] });
     await api.search("pago & cobro");
     await api.requirements("mi proyecto");
-    expect(calls.map((c) => c.path)).toEqual(["/search?q=pago%20%26%20cobro&limit=100", "/requirements?project=mi%20proyecto"]);
+    expect(calls.map((c) => c.path)).toEqual([
+      "/search?q=pago%20%26%20cobro&limit=100",
+      "/requirements?project=mi%20proyecto",
+    ]);
   });
 
   it("401 broadcasts mt:unauthorized", async () => {
@@ -49,7 +52,11 @@ describe("api client", () => {
   });
 
   it("surfaces FastAPI error details", async () => {
-    mockApi({ "POST /meetings/1/analyze": new Response(JSON.stringify({ detail: "La reunión sigue en curso" }), { status: 409 }) });
+    mockApi({
+      "POST /meetings/1/analyze": new Response(JSON.stringify({ detail: "La reunión sigue en curso" }), {
+        status: 409,
+      }),
+    });
     const err = await api.reanalyze(1).catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 409, message: "La reunión sigue en curso" });

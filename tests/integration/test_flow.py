@@ -16,8 +16,14 @@ def test_full_flow_with_verified_citations_and_history(client, env):
     # Reunión 1: requisito nuevo
     m1 = client.post("/meetings", json={"title": "Kickoff", "project": "pagos"}).json()["id"]
     upload(client, m1, 0, "El cliente quiere que el pago se haga solo con tarjeta.")
-    FakeAnalyzer.script = [Item(kind="new_requirement", requirement="Método de pago",
-                                summary="Solo tarjeta", quote="el pago se haga solo con tarjeta")]
+    FakeAnalyzer.script = [
+        Item(
+            kind="new_requirement",
+            requirement="Método de pago",
+            summary="Solo tarjeta",
+            quote="el pago se haga solo con tarjeta",
+        )
+    ]
     assert client.post(f"/meetings/{m1}/finish").status_code == 200
     drain()
 
@@ -25,10 +31,18 @@ def test_full_flow_with_verified_citations_and_history(client, env):
     m2 = client.post("/meetings", json={"title": "Revisión", "project": "pagos"}).json()["id"]
     upload(client, m2, 0, "Ahora también aceptamos Bizum para el pago.\n?esto se oyó muy mal")
     FakeAnalyzer.script = [
-        Item(kind="changed_requirement", requirement="Método de pago", summary="Se añade Bizum",
-             quote="también aceptamos Bizum para el pago"),
-        Item(kind="decision", requirement="Método de pago", summary="Alucinación",
-             quote="esta frase nunca se dijo en la reunión"),
+        Item(
+            kind="changed_requirement",
+            requirement="Método de pago",
+            summary="Se añade Bizum",
+            quote="también aceptamos Bizum para el pago",
+        ),
+        Item(
+            kind="decision",
+            requirement="Método de pago",
+            summary="Alucinación",
+            quote="esta frase nunca se dijo en la reunión",
+        ),
     ]
     client.post(f"/meetings/{m2}/finish")
     drain()

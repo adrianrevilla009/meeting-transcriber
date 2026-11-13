@@ -7,8 +7,8 @@ Uso:
     python capture_agent.py --api http://127.0.0.1:8000 --token TOKEN --title "Kickoff" --project pagos
 Ctrl+C termina la reunión y avisa a la API.
 """
+
 import argparse
-import io
 import queue
 import tempfile
 import threading
@@ -74,8 +74,12 @@ def record_stream(pa, device, source: str, chunk_s: int, start: float, uploader:
     rate, channels = int(device["defaultSampleRate"]), device["maxInputChannels"]
     frames_per_buffer = 1024
     stream = pa.open(
-        format=pyaudio.paInt16, channels=channels, rate=rate, input=True,
-        input_device_index=device["index"], frames_per_buffer=frames_per_buffer,
+        format=pyaudio.paInt16,
+        channels=channels,
+        rate=rate,
+        input=True,
+        input_device_index=device["index"],
+        frames_per_buffer=frames_per_buffer,
     )
     buf, seq = [], 0
     chunk_start = time.monotonic() - start
@@ -106,7 +110,9 @@ def main() -> None:
     args = ap.parse_args()
 
     headers = {"Authorization": f"Bearer {args.token}"}
-    r = requests.post(f"{args.api}/meetings", headers=headers, json={"title": args.title, "project": args.project}, timeout=15)
+    r = requests.post(
+        f"{args.api}/meetings", headers=headers, json={"title": args.title, "project": args.project}, timeout=15
+    )
     r.raise_for_status()
     meeting_id = r.json()["id"]
     print(f"Reunión {meeting_id} iniciada. Ctrl+C para terminar.")
@@ -121,10 +127,14 @@ def main() -> None:
     threads = []
     if not args.no_mic:
         mic = pa.get_default_input_device_info()
-        threads.append(threading.Thread(target=record_stream, args=(pa, mic, "mic", args.chunk_seconds, 0.0, uploader, stop)))
+        threads.append(
+            threading.Thread(target=record_stream, args=(pa, mic, "mic", args.chunk_seconds, 0.0, uploader, stop))
+        )
     if not args.no_system:
         loop = pa.get_default_wasapi_loopback()  # lo que suena por los altavoces/auriculares
-        threads.append(threading.Thread(target=record_stream, args=(pa, loop, "system", args.chunk_seconds, 0.0, uploader, stop)))
+        threads.append(
+            threading.Thread(target=record_stream, args=(pa, loop, "system", args.chunk_seconds, 0.0, uploader, stop))
+        )
     for t in threads:
         t.start()
     try:

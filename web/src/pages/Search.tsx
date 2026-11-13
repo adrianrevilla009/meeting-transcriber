@@ -43,7 +43,12 @@ export function Search() {
 
       <div className="search-hero rise">
         <SearchIcon size={22} />
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="presupuesto, fecha de entrega, Bizum…" />
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="presupuesto, fecha de entrega, Bizum…"
+        />
         {isFetching && <Spinner size={18} />}
       </div>
 

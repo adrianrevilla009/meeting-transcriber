@@ -35,7 +35,7 @@ services:
   # Frontal React servido por nginx; /api se redirige a la API (sin CORS). Solo en localhost.
   web:
     build: ./web
-    ports: ["127.0.0.1:3000:80"]
+    ports: ["127.0.0.1:3000:8080"]
     networks: [edge]
     depends_on: [api]
     restart: unless-stopped

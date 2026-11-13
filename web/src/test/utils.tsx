@@ -28,12 +28,18 @@ export function mockApi(routes: Record<string, Handler>) {
       const path = url.pathname.replace(/^\/api/, "");
       calls.push({ method, path: path + url.search, init });
       const key = [`${method} ${path}${url.search}`, `${method} ${path}`].find((k) => k in routes);
-      if (!key) return new Response(JSON.stringify({ detail: "no mock" }), { status: 404, headers: { "content-type": "application/json" } });
+      if (!key)
+        return new Response(JSON.stringify({ detail: "no mock" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        });
       const h = routes[key];
-      const body = typeof h === "function" ? await (h as (r: { url: URL; init: RequestInit }) => unknown)({ url, init }) : h;
+      const body =
+        typeof h === "function" ? await (h as (r: { url: URL; init: RequestInit }) => unknown)({ url, init }) : h;
       if (body instanceof Response) return body;
       if (body === undefined) return new Response(null, { status: 204 });
-      if (typeof body === "string") return new Response(body, { status: 200, headers: { "content-type": "text/markdown" } });
+      if (typeof body === "string")
+        return new Response(body, { status: 200, headers: { "content-type": "text/markdown" } });
       return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
     }),
   );

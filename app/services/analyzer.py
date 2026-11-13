@@ -1,8 +1,10 @@
 """Extracción de requisitos/decisiones/dudas con LLM local. El LLM NUNCA reescribe la transcripción:
 solo extrae, y cada elemento debe traer una cita literal que se verifica contra los segmentos."""
+
 import json
 import logging
-from typing import Protocol
+from collections.abc import Sequence
+from typing import ClassVar, Protocol
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -91,7 +93,7 @@ class OllamaAnalyzer:
 class FakeAnalyzer:
     """Para tests: devuelve el guion `script` (lista de Item) sin llamar a ningún LLM."""
 
-    script: list[Item] = []
+    script: ClassVar[list[Item]] = []
 
     def extract(self, transcript_window: str) -> list[Item]:
         return list(self.script)
@@ -106,8 +108,10 @@ def get_analyzer() -> Analyzer | None:
     return None
 
 
-def _windows(segments: list[Segment], max_chars: int) -> list[str]:
-    out, cur, size = [], [], 0
+def _windows(segments: Sequence[Segment], max_chars: int) -> list[str]:
+    out: list[str] = []
+    cur: list[str] = []
+    size = 0
     for s in segments:
         line = s.text
         if size + len(line) > max_chars and cur:
@@ -144,9 +148,7 @@ def analyze_meeting(session: Session, meeting: Meeting) -> dict:
         session.commit()
         return {"accepted": 0, "rejected": 0}
 
-    segments = session.scalars(
-        select(Segment).where(Segment.meeting_id == meeting.id).order_by(Segment.start)
-    ).all()
+    segments = session.scalars(select(Segment).where(Segment.meeting_id == meeting.id).order_by(Segment.start)).all()
     # Reanálisis: reemplaza los eventos previos de esta reunión.
     for ev in list(meeting.events):
         session.delete(ev)

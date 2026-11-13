@@ -76,5 +76,7 @@ export function highlight(text: string, needle: string) {
   if (!needle) return text;
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const parts = text.split(new RegExp(`(${escaped})`, "gi"));
-  return parts.map((p, i) => (p.toLowerCase() === needle.toLowerCase() ? <mark key={i}>{p}</mark> : <span key={i}>{p}</span>));
+  return parts.map((p, i) =>
+    p.toLowerCase() === needle.toLowerCase() ? <mark key={i}>{p}</mark> : <span key={i}>{p}</span>,
+  );
 }

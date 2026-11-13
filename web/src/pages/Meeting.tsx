@@ -18,7 +18,18 @@ import {
   Trash2,
 } from "lucide-react";
 import { api } from "../api";
-import { downloadText, fmtDate, fmtDuration, fmtTs, KIND, meetingTitle, phaseOf, slug, SPEAKER, type Phase } from "../format";
+import {
+  downloadText,
+  fmtDate,
+  fmtDuration,
+  fmtTs,
+  KIND,
+  meetingTitle,
+  phaseOf,
+  slug,
+  SPEAKER,
+  type Phase,
+} from "../format";
 import type { EventKind, Meeting as MeetingT, MtEvent, Progress, Segment } from "../types";
 import { ConfirmButton, Empty, highlight, ProgressBar, ProjectTag, Spinner, StatusPill } from "../components/ui";
 import { useToast } from "../components/Toasts";
@@ -42,10 +53,19 @@ function Stepper({ phase, progress }: { phase: Phase; progress?: Progress }) {
   return (
     <div className="stepper glass">
       {steps.map((s, i) => {
-        const state = i < at || (i === 3 && phase === "ready") ? "done" : i === at ? (phase === "failed" ? "error" : "active") : "todo";
+        const state =
+          i < at || (i === 3 && phase === "ready")
+            ? "done"
+            : i === at
+              ? phase === "failed"
+                ? "error"
+                : "active"
+              : "todo";
         return (
           <div key={s.label} className={`step step-${state}`}>
-            <div className="step-dot">{state === "done" ? <Check size={14} /> : state === "active" ? <Spinner size={14} /> : i + 1}</div>
+            <div className="step-dot">
+              {state === "done" ? <Check size={14} /> : state === "active" ? <Spinner size={14} /> : i + 1}
+            </div>
             <div className="step-text">
               <strong>{s.label}</strong>
               {s.detail && <span className="muted small">{s.detail}</span>}
@@ -76,7 +96,9 @@ function Transcript({ segments, phase, focus }: { segments: Segment[]; phase: Ph
   }, [focus, segments.length]);
 
   const needle = q.trim().toLowerCase();
-  const visible = segments.filter((s) => (!onlyDoubtful || s.low_confidence) && (!needle || s.text.toLowerCase().includes(needle)));
+  const visible = segments.filter(
+    (s) => (!onlyDoubtful || s.low_confidence) && (!needle || s.text.toLowerCase().includes(needle)),
+  );
   const doubtful = segments.filter((s) => s.low_confidence).length;
 
   if (!segments.length) {
@@ -112,7 +134,10 @@ function Transcript({ segments, phase, focus }: { segments: Segment[]; phase: Ph
           return (
             <div key={s.id} data-seg={s.id} className={`bubble-row from-${s.source} ${first ? "first" : ""}`}>
               {first && <div className="bubble-who">{SPEAKER[s.source] ?? s.source}</div>}
-              <div className={`bubble ${s.low_confidence ? "doubtful" : ""}`} title={s.low_confidence ? "Baja confianza: revisa esta frase" : undefined}>
+              <div
+                className={`bubble ${s.low_confidence ? "doubtful" : ""}`}
+                title={s.low_confidence ? "Baja confianza: revisa esta frase" : undefined}
+              >
                 <span className="bubble-ts mono">{fmtTs(s.start)}</span>
                 <span>{needle ? highlight(s.text, needle) : s.text}</span>
                 {s.low_confidence && <AlertTriangle size={13} className="bubble-flag" />}
@@ -165,7 +190,11 @@ function Insights({
     );
   }
   if (meeting.analysis_status === "skipped") {
-    return <Empty icon={<Brain size={24} />} title="Análisis desactivado">MT_ANALYZER=none en la configuración.</Empty>;
+    return (
+      <Empty icon={<Brain size={24} />} title="Análisis desactivado">
+        MT_ANALYZER=none en la configuración.
+      </Empty>
+    );
   }
   if (!events.length) {
     return (
@@ -234,7 +263,12 @@ export function Meeting() {
   const phase: Phase | null = m ? phaseOf(m) : null;
   const live = phase === "recording" || phase === "transcribing" || phase === "analyzing";
 
-  const progressQ = useQuery({ queryKey: ["progress", id], queryFn: () => api.progress(id), enabled: !!m, refetchInterval: live ? 2500 : false });
+  const progressQ = useQuery({
+    queryKey: ["progress", id],
+    queryFn: () => api.progress(id),
+    enabled: !!m,
+    refetchInterval: live ? 2500 : false,
+  });
   const segmentsQ = useQuery({
     queryKey: ["segments", id],
     queryFn: () => api.segments(id),
@@ -242,7 +276,11 @@ export function Meeting() {
     refetchInterval: phase === "recording" || phase === "transcribing" ? 4000 : false,
   });
   const eventsQ = useQuery({ queryKey: ["events", id], queryFn: () => api.events(id), enabled: !!m });
-  const reqsQ = useQuery({ queryKey: ["requirements", m?.project ?? ""], queryFn: () => api.requirements(m?.project || undefined), enabled: !!m });
+  const reqsQ = useQuery({
+    queryKey: ["requirements", m?.project ?? ""],
+    queryFn: () => api.requirements(m?.project || undefined),
+    enabled: !!m,
+  });
 
   // Al cambiar de fase, refresca lo que depende de ella.
   useEffect(() => {
@@ -254,7 +292,12 @@ export function Meeting() {
 
   const reqTitles = useMemo(() => new Map((reqsQ.data ?? []).map((r) => [r.id, r.title])), [reqsQ.data]);
 
-  if (meetingQ.isLoading) return <div className="page center-pad"><Spinner size={24} /></div>;
+  if (meetingQ.isLoading)
+    return (
+      <div className="page center-pad">
+        <Spinner size={24} />
+      </div>
+    );
   if (meetingQ.error || !m || !phase) {
     return (
       <div className="page">
@@ -366,7 +409,8 @@ export function Meeting() {
       )}
       {progressQ.data && progressQ.data.chunks_failed > 0 && (
         <div className="alert alert-warn">
-          <AlertTriangle size={16} /> {progressQ.data.chunks_failed} fragmentos no se pudieron transcribir (mira <code>make logs</code>).
+          <AlertTriangle size={16} /> {progressQ.data.chunks_failed} fragmentos no se pudieron transcribir (mira{" "}
+          <code>make logs</code>).
         </div>
       )}
 
@@ -385,7 +429,14 @@ export function Meeting() {
 
       <div className="glass tab-panel">
         {tab === "insights" ? (
-          <Insights meeting={m} events={eventsQ.data ?? []} loading={eventsQ.isLoading} phase={phase} reqTitles={reqTitles} onJump={jump} />
+          <Insights
+            meeting={m}
+            events={eventsQ.data ?? []}
+            loading={eventsQ.isLoading}
+            phase={phase}
+            reqTitles={reqTitles}
+            onJump={jump}
+          />
         ) : (
           <Transcript segments={segmentsQ.data ?? []} phase={phase} focus={focus} />
         )}
@@ -393,4 +444,3 @@ export function Meeting() {
     </div>
   );
 }
-

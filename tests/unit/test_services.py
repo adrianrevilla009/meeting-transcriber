@@ -1,5 +1,6 @@
 """Export a Markdown, almacenamiento de audio, transcriptor falso y autenticación."""
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import HTTPException
@@ -17,7 +18,7 @@ def test_fmt_ts(secs, out):
 
 
 def test_markdown_contains_analysis_speakers_and_flags(session):
-    m = Meeting(title="Kickoff", project="pagos", created_at=datetime(2026, 11, 13, 10, 30, tzinfo=timezone.utc))
+    m = Meeting(title="Kickoff", project="pagos", created_at=datetime(2026, 11, 13, 10, 30, tzinfo=UTC))
     session.add(m)
     session.flush()
     s1 = Segment(meeting_id=m.id, source="mic", start=0, end=4, text="Quiero pagar con Bizum.")
@@ -25,10 +26,27 @@ def test_markdown_contains_analysis_speakers_and_flags(session):
     req = Requirement(project="pagos", title="Método de pago")
     session.add_all([s1, s2, req])
     session.flush()
-    session.add(RequirementEvent(meeting_id=m.id, requirement_id=req.id, segment_id=s1.id, kind="new_requirement",
-                                 summary="Pago con Bizum", quote="pagar con Bizum", timestamp=0))
-    session.add(RequirementEvent(meeting_id=m.id, segment_id=s2.id, kind="open_question", summary="¿Qué se dijo?",
-                                 quote="se oyó fatal", timestamp=65))
+    session.add(
+        RequirementEvent(
+            meeting_id=m.id,
+            requirement_id=req.id,
+            segment_id=s1.id,
+            kind="new_requirement",
+            summary="Pago con Bizum",
+            quote="pagar con Bizum",
+            timestamp=0,
+        )
+    )
+    session.add(
+        RequirementEvent(
+            meeting_id=m.id,
+            segment_id=s2.id,
+            kind="open_question",
+            summary="¿Qué se dijo?",
+            quote="se oyó fatal",
+            timestamp=65,
+        )
+    )
     session.commit()
 
     md = render_markdown(session, m)
@@ -88,3 +106,11 @@ def test_require_token_rejects(env, header):
 @pytest.mark.parametrize("header", ["Bearer tok", "bearer tok"])
 def test_require_token_accepts(env, header):
     assert require_token(header) is None
+
+
+@pytest.mark.parametrize("configured", ["", "change-me"])
+def test_unconfigured_token_fails_closed(env, set_env, configured):
+    set_env("MT_API_TOKEN", configured)
+    with pytest.raises(HTTPException) as e:
+        require_token("Bearer change-me")
+    assert e.value.status_code == 503

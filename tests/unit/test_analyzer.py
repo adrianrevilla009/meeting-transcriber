@@ -1,4 +1,7 @@
 """Cliente de Ollama y troceado de la transcripción (sin LLM real)."""
+
+import itertools
+
 import httpx
 import pytest
 
@@ -13,7 +16,9 @@ class FakeResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise httpx.HTTPStatusError("boom", request=httpx.Request("POST", "http://x"), response=httpx.Response(self.status_code))
+            raise httpx.HTTPStatusError(
+                "boom", request=httpx.Request("POST", "http://x"), response=httpx.Response(self.status_code)
+            )
 
     def json(self):
         return {"message": {"content": self._content}}
@@ -56,7 +61,14 @@ def test_ollama_items_are_parsed(ollama):
         '"quote":"se entregará el quince de diciembre"}]}'
     )
     items = OllamaAnalyzer().extract("x")
-    assert items == [Item(kind="decision", requirement="Entrega", summary="Se entrega en diciembre", quote="se entregará el quince de diciembre")]
+    assert items == [
+        Item(
+            kind="decision",
+            requirement="Entrega",
+            summary="Se entrega en diciembre",
+            quote="se entregará el quince de diciembre",
+        )
+    ]
 
 
 @pytest.mark.parametrize(
@@ -76,7 +88,9 @@ def test_malformed_llm_output_is_discarded(ollama, content):
 
 def test_one_malformed_item_does_not_discard_the_valid_ones(ollama):
     respond, _ = ollama
-    respond('{"items":[{"kind":"decision","summary":"ok","quote":"cita válida larga"},{"summary":"sin tipo ni cita"},"basura"]}')
+    respond(
+        '{"items":[{"kind":"decision","summary":"ok","quote":"cita válida larga"},{"summary":"sin tipo ni cita"},"basura"]}'
+    )
     assert [i.summary for i in OllamaAnalyzer().extract("x")] == ["ok"]
 
 
@@ -98,7 +112,9 @@ def test_http_errors_propagate_so_the_worker_marks_failure(ollama):
         OllamaAnalyzer().extract("x")
 
 
-@pytest.mark.parametrize(("name", "cls"), [("ollama", OllamaAnalyzer), ("fake", analyzer.FakeAnalyzer), ("none", type(None))])
+@pytest.mark.parametrize(
+    ("name", "cls"), [("ollama", OllamaAnalyzer), ("fake", analyzer.FakeAnalyzer), ("none", type(None))]
+)
 def test_get_analyzer_by_config(env, set_env, name, cls):
     set_env("MT_ANALYZER", name)
     assert isinstance(get_analyzer(), cls)
@@ -114,7 +130,7 @@ def test_windows_fit_in_budget_and_overlap_two_segments():
     assert len(windows) > 1
     for w in windows:
         assert len(w.replace("\n", "")) <= 200 + 50  # un segmento puede desbordar el último hueco
-    for a, b in zip(windows, windows[1:]):
+    for a, b in itertools.pairwise(windows):
         assert a.splitlines()[-2:] == b.splitlines()[:2]  # solape para no cortar citas
     joined = "\n".join(windows)
     assert all(t in joined for t in texts)  # no se pierde nada

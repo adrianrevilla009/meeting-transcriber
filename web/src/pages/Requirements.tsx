@@ -52,7 +52,10 @@ function RequirementCard({
                 <div className="timeline-body">
                   <div className="timeline-top">
                     <KindBadge kind={e.kind} />
-                    <Link to={`/meetings/${e.meeting_id}${e.segment_id ? `?seg=${e.segment_id}` : ""}`} className="link">
+                    <Link
+                      to={`/meetings/${e.meeting_id}${e.segment_id ? `?seg=${e.segment_id}` : ""}`}
+                      className="link"
+                    >
                       {m ? meetingTitle(m) : `Reunión #${e.meeting_id}`}
                     </Link>
                     <span className="muted small">
@@ -82,7 +85,7 @@ export function Requirements() {
 
   const reqsQ = useQuery({ queryKey: ["requirements"], queryFn: () => api.requirements() });
   const meetingsQ = useQuery({ queryKey: ["meetings"], queryFn: api.meetings });
-  const reqs = reqsQ.data ?? [];
+  const reqs = useMemo(() => reqsQ.data ?? [], [reqsQ.data]);
   const projects = useMemo(() => [...new Set(reqs.map((r) => r.project).filter(Boolean))].sort(), [reqs]);
   const filtered = reqs.filter((r) => !project || r.project === project);
 
@@ -93,7 +96,10 @@ export function Requirements() {
 
   useEffect(() => {
     if (focus == null) return;
-    const t = setTimeout(() => document.getElementById(`req-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    const t = setTimeout(
+      () => document.getElementById(`req-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      300,
+    );
     return () => clearTimeout(t);
   }, [focus, histories.length]);
 
@@ -109,7 +115,9 @@ export function Requirements() {
     <div className="page">
       <header className="page-head rise">
         <h1 className="display-sm">Requisitos</h1>
-        <p className="muted">Cómo evoluciona cada requisito a lo largo de las reuniones, con la cita exacta de quién lo dijo.</p>
+        <p className="muted">
+          Cómo evoluciona cada requisito a lo largo de las reuniones, con la cita exacta de quién lo dijo.
+        </p>
       </header>
 
       {projects.length > 0 && (
@@ -139,7 +147,13 @@ export function Requirements() {
         {filtered.map((r, i) => {
           const h = histories[i]?.data;
           return h ? (
-            <RequirementCard key={r.id} history={h} meetings={meetings} open={open.has(r.id)} onToggle={() => toggle(r.id)} />
+            <RequirementCard
+              key={r.id}
+              history={h}
+              meetings={meetings}
+              open={open.has(r.id)}
+              onToggle={() => toggle(r.id)}
+            />
           ) : (
             <div key={r.id} className="req glass skeleton-card" />
           );

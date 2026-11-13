@@ -8,7 +8,12 @@ export function fmtTs(seconds: number | null | undefined): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${String(m).padStart(2, "0")}:${sec}`;
 }
 
-const dateFmt = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dateFmt = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const rtf = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
 
 export function fmtDate(iso: string): string {

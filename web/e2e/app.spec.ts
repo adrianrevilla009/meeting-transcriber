@@ -9,7 +9,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 function token(): string {
   if (process.env.MT_API_TOKEN) return process.env.MT_API_TOKEN;
   const env = path.resolve(here, "../../.env");
-  const line = fs.existsSync(env) ? fs.readFileSync(env, "utf8").split(/\r?\n/).find((l) => l.startsWith("MT_API_TOKEN=")) : undefined;
+  const line = fs.existsSync(env)
+    ? fs
+        .readFileSync(env, "utf8")
+        .split(/\r?\n/)
+        .find((l) => l.startsWith("MT_API_TOKEN="))
+    : undefined;
   if (!line) throw new Error("Define MT_API_TOKEN o crea .env");
   return line.slice("MT_API_TOKEN=".length).trim();
 }
@@ -24,7 +29,8 @@ async function loggedIn(page: Page) {
 async function cleanup(request: APIRequestContext) {
   const res = await request.get(`/api/meetings?project=${PROJECT}`, { headers: auth });
   if (!res.ok()) return;
-  for (const m of (await res.json()) as { id: number }[]) await request.delete(`/api/meetings/${m.id}`, { headers: auth });
+  for (const m of (await res.json()) as { id: number }[])
+    await request.delete(`/api/meetings/${m.id}`, { headers: auth });
 }
 
 test.beforeAll(async ({ request }) => {

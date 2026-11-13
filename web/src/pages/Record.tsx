@@ -56,7 +56,12 @@ function Setup() {
         <div className="form-grid">
           <label className="field">
             <span>Título</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Kickoff con cliente" autoFocus />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Kickoff con cliente"
+              autoFocus
+            />
           </label>
           <label className="field">
             <span>Proyecto</span>
@@ -70,7 +75,13 @@ function Setup() {
         </div>
 
         <div className="sources">
-          <SourceToggle on={mic} onChange={setMic} icon={<Mic size={20} />} title="Tu micrófono" text='Aparece como "Yo"' />
+          <SourceToggle
+            on={mic}
+            onChange={setMic}
+            icon={<Mic size={20} />}
+            title="Tu micrófono"
+            text='Aparece como "Yo"'
+          />
           <SourceToggle
             on={system}
             onChange={setSystem}
@@ -176,7 +187,10 @@ function Live() {
         </div>
         {stats.queued > 0 && (
           <div>
-            <Spinner size={14} /> <span className="muted">{stats.queued} en cola{stats.retrying ? " (reintentando)" : ""}</span>
+            <Spinner size={14} />{" "}
+            <span className="muted">
+              {stats.queued} en cola{stats.retrying ? " (reintentando)" : ""}
+            </span>
           </div>
         )}
         {stats.failed > 0 && (

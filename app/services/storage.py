@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, timedelta
 from pathlib import Path
 
 from sqlalchemy import select
@@ -38,14 +38,12 @@ def purge_expired_audio(session: Session) -> int:
     if days <= 0:
         return 0  # con retención 0 el worker ya borra al transcribir
     limit = utcnow() - timedelta(days=days)
-    rows = session.scalars(
-        select(Chunk).where(Chunk.status == ChunkStatus.done, Chunk.path.is_not(None))
-    ).all()
+    rows = session.scalars(select(Chunk).where(Chunk.status == ChunkStatus.done, Chunk.path.is_not(None))).all()
     n = 0
     for c in rows:
         processed = c.processed_at
         if processed is not None and processed.tzinfo is None:
-            processed = processed.replace(tzinfo=timezone.utc)
+            processed = processed.replace(tzinfo=UTC)
         if processed and processed < limit:
             delete_audio(c.path)
             c.path = None

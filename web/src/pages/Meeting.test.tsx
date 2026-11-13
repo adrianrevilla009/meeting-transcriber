@@ -11,8 +11,23 @@ const SEGMENTS = [
   segment({ id: 3, source: "mic", start: 8, text: "Lo apunto, ¿y en dólares?", low_confidence: true }),
 ];
 const EVENTS = [
-  event({ id: 1, kind: "new_requirement", requirement_id: 7, segment_id: 2, timestamp: 3, summary: "Pago con Bizum", quote: "pagar con Bizum" }),
-  event({ id: 2, kind: "open_question", segment_id: 3, timestamp: 8, summary: "¿Pagos en dólares?", quote: "y en dólares" }),
+  event({
+    id: 1,
+    kind: "new_requirement",
+    requirement_id: 7,
+    segment_id: 2,
+    timestamp: 3,
+    summary: "Pago con Bizum",
+    quote: "pagar con Bizum",
+  }),
+  event({
+    id: 2,
+    kind: "open_question",
+    segment_id: 3,
+    timestamp: 8,
+    summary: "¿Pagos en dólares?",
+    quote: "y en dólares",
+  }),
 ];
 
 function setup(m: Partial<MeetingT> = {}, extra: Record<string, unknown> = {}) {
@@ -89,7 +104,10 @@ describe("Meeting page", () => {
   });
 
   it("shows live transcription progress and skeletons while processing", async () => {
-    setup({ status: "finished", analysis_status: "pending" }, { "GET /meetings/1/progress": progress({ chunks_total: 4, chunks_done: 1, segments: 2 }) });
+    setup(
+      { status: "finished", analysis_status: "pending" },
+      { "GET /meetings/1/progress": progress({ chunks_total: 4, chunks_done: 1, segments: 2 }) },
+    );
     open();
     expect(await screen.findByText("1/4 · 2 frases")).toBeInTheDocument();
     expect(document.querySelector(".step-active")).toHaveTextContent("Transcripción");
@@ -98,11 +116,16 @@ describe("Meeting page", () => {
   });
 
   it("failed analysis shows the error and retries", async () => {
-    const calls = setup({ analysis_status: "failed", analysis_error: "Ollama timeout" }, { "POST /meetings/1/analyze": meeting({ analysis_status: "pending" }) });
+    const calls = setup(
+      { analysis_status: "failed", analysis_error: "Ollama timeout" },
+      { "POST /meetings/1/analyze": meeting({ analysis_status: "pending" }) },
+    );
     open();
     expect(await screen.findByText("Ollama timeout")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
-    await vi.waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path === "/meetings/1/analyze")).toBe(true));
+    await vi.waitFor(() =>
+      expect(calls.some((c) => c.method === "POST" && c.path === "/meetings/1/analyze")).toBe(true),
+    );
     expect(await screen.findByText("Reanálisis en cola")).toBeInTheDocument();
   });
 
@@ -113,10 +136,15 @@ describe("Meeting page", () => {
   });
 
   it("offers to close a meeting left open by a closed browser", async () => {
-    const calls = setup({ status: "recording", finished_at: null }, { "POST /meetings/1/finish": meeting({ status: "finished" }) });
+    const calls = setup(
+      { status: "recording", finished_at: null },
+      { "POST /meetings/1/finish": meeting({ status: "finished" }) },
+    );
     open();
     await userEvent.click(await screen.findByRole("button", { name: /Cerrar y transcribir/ }));
-    await vi.waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path === "/meetings/1/finish")).toBe(true));
+    await vi.waitFor(() =>
+      expect(calls.some((c) => c.method === "POST" && c.path === "/meetings/1/finish")).toBe(true),
+    );
   });
 
   it("deletes only after confirming, then goes home", async () => {

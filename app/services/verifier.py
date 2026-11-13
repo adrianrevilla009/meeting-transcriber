@@ -1,6 +1,9 @@
 """Verificación de citas: una cita del LLM solo se acepta si aparece en la transcripción cruda."""
+
+import itertools
 import re
 import unicodedata
+from collections.abc import Sequence
 
 from rapidfuzz import fuzz
 
@@ -14,7 +17,7 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def locate_quote(quote: str, segments: list[Segment], min_score: float) -> Segment | None:
+def locate_quote(quote: str, segments: Sequence[Segment], min_score: float) -> Segment | None:
     """Devuelve el segmento donde está la cita, o None si no se puede verificar.
 
     Se prueba cada segmento solo y cada par de segmentos consecutivos (citas que cruzan el corte).
@@ -25,7 +28,7 @@ def locate_quote(quote: str, segments: list[Segment], min_score: float) -> Segme
     if len(q) < 8:
         return None
     norm = [normalize(s.text) for s in segments]
-    pairs = [f"{a} {b}" for a, b in zip(norm, norm[1:])]
+    pairs = [f"{a} {b}" for a, b in itertools.pairwise(norm)]
 
     for i, n in enumerate(norm):
         if q in n:

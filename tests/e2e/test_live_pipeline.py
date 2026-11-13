@@ -6,6 +6,7 @@
 El audio es voz sintética en español (tests/fixtures/speech_es.wav, generado con make_speech.ps1) y su
 guion exacto está en speech_es.txt, así que se puede medir el WER real de Whisper.
 """
+
 import os
 import time
 from pathlib import Path

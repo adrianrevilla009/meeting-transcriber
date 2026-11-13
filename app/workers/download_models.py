@@ -1,4 +1,5 @@
 """Descarga el modelo Whisper a la carpeta local (ejecutar con red; luego se puede aislar)."""
+
 from app.config import get_settings
 
 

@@ -165,7 +165,12 @@ export class SourceCapture {
   private acc: ChunkAccumulator;
   private onFinal: (() => void) | null = null;
 
-  constructor(ctx: AudioContext, stream: MediaStream, readonly source: Source, onChunk: (c: AudioChunk) => void) {
+  constructor(
+    ctx: AudioContext,
+    stream: MediaStream,
+    readonly source: Source,
+    onChunk: (c: AudioChunk) => void,
+  ) {
     this.acc = new ChunkAccumulator(source, ctx.sampleRate, onChunk);
     this.src = ctx.createMediaStreamSource(stream);
     this.analyser = ctx.createAnalyser();
@@ -238,7 +243,10 @@ export class Uploader {
       for (let attempt = 1; attempt <= 6 && !ok; attempt++) {
         try {
           const form = new FormData();
-          form.append("file", new File([c.blob], `${String(c.seq).padStart(6, "0")}_${c.source}.wav`, { type: "audio/wav" }));
+          form.append(
+            "file",
+            new File([c.blob], `${String(c.seq).padStart(6, "0")}_${c.source}.wav`, { type: "audio/wav" }),
+          );
           form.append("seq", String(c.seq));
           form.append("offset_seconds", c.offset.toFixed(3));
           form.append("source", c.source);

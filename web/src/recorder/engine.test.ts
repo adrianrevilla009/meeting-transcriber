@@ -53,7 +53,15 @@ describe("resample", () => {
 describe("encodeWav", () => {
   it("writes a valid 16-bit PCM mono header", async () => {
     const info = await wavInfo(encodeWav(new Float32Array(160), 16000));
-    expect(info).toMatchObject({ riff: "RIFF", wave: "WAVE", format: 1, channels: 1, rate: 16000, bits: 16, dataBytes: 320 });
+    expect(info).toMatchObject({
+      riff: "RIFF",
+      wave: "WAVE",
+      format: 1,
+      channels: 1,
+      rate: 16000,
+      bits: 16,
+      dataBytes: 320,
+    });
   });
 
   it("scales and clips samples", async () => {
@@ -106,7 +114,13 @@ vi.mock("../api", async (orig) => {
 describe("Uploader", async () => {
   const { api, ApiError } = await import("../api");
   const upload = vi.mocked(api.uploadChunk);
-  const chunk = (seq: number): AudioChunk => ({ seq, source: "mic", offset: seq * 45, seconds: 45, blob: new Blob(["x"]) });
+  const chunk = (seq: number): AudioChunk => ({
+    seq,
+    source: "mic",
+    offset: seq * 45,
+    seconds: 45,
+    blob: new Blob(["x"]),
+  });
 
   it("uploads in order with the right form fields", async () => {
     upload.mockReset().mockResolvedValue({});
@@ -126,7 +140,11 @@ describe("Uploader", async () => {
   });
 
   it("retries transient errors and then succeeds", async () => {
-    upload.mockReset().mockRejectedValueOnce(new ApiError(0, "red")).mockRejectedValueOnce(new ApiError(503, "x")).mockResolvedValue({});
+    upload
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(0, "red"))
+      .mockRejectedValueOnce(new ApiError(503, "x"))
+      .mockResolvedValue({});
     const u = new Uploader(1, () => undefined, 1);
     u.add(chunk(0));
     await u.idle();

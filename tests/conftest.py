@@ -65,4 +65,3 @@ def set_env(monkeypatch):
         config.get_settings.cache_clear()
 
     return _set
-

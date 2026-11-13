@@ -42,24 +42,38 @@ describe("Record setup", () => {
 
   it("deletes the half-created meeting if audio setup fails afterwards", async () => {
     const track = { stop: vi.fn() };
-    const calls = mockApi({ "GET /meetings": [], "POST /meetings": meeting({ id: 5, status: "recording" }), "DELETE /meetings/5": undefined });
+    const calls = mockApi({
+      "GET /meetings": [],
+      "POST /meetings": meeting({ id: 5, status: "recording" }),
+      "DELETE /meetings/5": undefined,
+    });
     mediaDevices({ getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track] }) });
-    vi.stubGlobal("AudioContext", vi.fn(() => { throw new Error("Sin Web Audio"); })); // prettier-ignore
+    vi.stubGlobal("AudioContext", vi.fn(function () { throw new Error("Sin Web Audio"); })); // prettier-ignore
     renderApp(<Record />);
     await userEvent.type(screen.getByPlaceholderText("Kickoff con cliente"), "Demo");
     await userEvent.click(screen.getByRole("button", { name: /Audio del ordenador/ }));
     await userEvent.click(orb());
     expect(await screen.findByText("Sin Web Audio")).toBeInTheDocument();
-    expect(calls.filter((c) => c.method !== "GET").map((c) => `${c.method} ${c.path}`)).toEqual(["POST /meetings", "DELETE /meetings/5"]);
-    expect(JSON.parse(calls.find((c) => c.method === "POST")!.init.body as string)).toEqual({ title: "Demo", project: "" });
+    expect(calls.filter((c) => c.method !== "GET").map((c) => `${c.method} ${c.path}`)).toEqual([
+      "POST /meetings",
+      "DELETE /meetings/5",
+    ]);
+    expect(JSON.parse(calls.find((c) => c.method === "POST")!.init.body as string)).toEqual({
+      title: "Demo",
+      project: "",
+    });
     expect(track.stop).toHaveBeenCalled(); // libera el micrófono
   });
 
   it("continues with the mic only when screen sharing is cancelled", async () => {
-    mockApi({ "GET /meetings": [], "POST /meetings": meeting({ id: 6, status: "recording" }), "DELETE /meetings/6": undefined });
+    mockApi({
+      "GET /meetings": [],
+      "POST /meetings": meeting({ id: 6, status: "recording" }),
+      "DELETE /meetings/6": undefined,
+    });
     const display = vi.fn().mockRejectedValue(new DOMException("cancel", "NotAllowedError"));
     mediaDevices({ getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [] }), getDisplayMedia: display });
-    vi.stubGlobal("AudioContext", vi.fn(() => { throw new Error("parar aquí"); })); // prettier-ignore
+    vi.stubGlobal("AudioContext", vi.fn(function () { throw new Error("parar aquí"); })); // prettier-ignore
     renderApp(<Record />);
     await userEvent.click(orb());
     expect(await screen.findByText("parar aquí")).toBeInTheDocument(); // llegó a crear el audio: no abortó por la pantalla

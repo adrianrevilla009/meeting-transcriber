@@ -3,6 +3,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Valor centinela: no es una credencial, marca que MT_API_TOKEN no está configurado.
+UNSET_TOKEN = "change-me"  # noqa: S105  # nosec B105
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MT_", env_file=".env", extra="ignore")
@@ -12,7 +15,7 @@ class Settings(BaseSettings):
     export_dir: Path = Path("./data/exports")
 
     # Seguridad: token simple para API y agente.
-    api_token: str = "change-me"
+    api_token: str = UNSET_TOKEN  # sin MT_API_TOKEN la API rechaza todas las peticiones
 
     # Transcripción
     transcriber: str = "faster-whisper"  # "faster-whisper" | "fake"

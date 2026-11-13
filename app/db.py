@@ -26,6 +26,8 @@ def get_engine():
 
 def session_factory() -> sessionmaker:
     get_engine()
+    if _SessionLocal is None:  # get_engine() siempre lo inicializa
+        raise RuntimeError("Base de datos no inicializada")
     return _SessionLocal
 
 

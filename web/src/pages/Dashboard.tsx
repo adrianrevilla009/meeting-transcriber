@@ -25,7 +25,11 @@ function MeetingCard({ m, index }: { m: Meeting; index: number }) {
   const duration = fmtDuration(m.created_at, m.finished_at);
 
   return (
-    <Link to={`/meetings/${m.id}`} className={`meeting-card glass rise ${busy ? "is-busy" : ""}`} style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}>
+    <Link
+      to={`/meetings/${m.id}`}
+      className={`meeting-card glass rise ${busy ? "is-busy" : ""}`}
+      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+    >
       <div className="meeting-card-top">
         <StatusPill phase={phase} />
         <ProjectTag name={m.project} />
@@ -38,9 +42,7 @@ function MeetingCard({ m, index }: { m: Meeting; index: number }) {
       {phase === "transcribing" && (
         <div className="meeting-card-progress">
           <ProgressBar value={ratio} />
-          <span className="muted small">
-            {p ? `${p.chunks_done}/${p.chunks_total} fragmentos` : "…"}
-          </span>
+          <span className="muted small">{p ? `${p.chunks_done}/${p.chunks_total} fragmentos` : "…"}</span>
         </div>
       )}
       {phase === "analyzing" && (
@@ -58,10 +60,15 @@ export function Dashboard() {
   const [project, setProject] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
-  const { data: meetings, isLoading, error } = useQuery({
+  const {
+    data: meetings,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["meetings"],
     queryFn: api.meetings,
-    refetchInterval: (q) => (q.state.data?.some((m) => phaseOf(m) !== "ready" && phaseOf(m) !== "failed") ? 4000 : 20_000),
+    refetchInterval: (q) =>
+      q.state.data?.some((m) => phaseOf(m) !== "ready" && phaseOf(m) !== "failed") ? 4000 : 20_000,
   });
   const { data: requirements } = useQuery({ queryKey: ["requirements"], queryFn: () => api.requirements() });
 
@@ -93,8 +100,8 @@ export function Dashboard() {
             Graba. Transcribe. <span className="gradient-text">Entiende.</span>
           </h1>
           <p className="muted">
-            Pulsa grabar al empezar la reunión. Al terminar, Whisper la transcribe y la IA extrae requisitos,
-            decisiones y dudas — todo en tu máquina.
+            Pulsa grabar al empezar la reunión. Al terminar, Whisper la transcribe y la IA extrae requisitos, decisiones
+            y dudas — todo en tu máquina.
           </p>
         </div>
         <button className="record-cta" onClick={() => navigate("/record")}>
@@ -158,7 +165,9 @@ export function Dashboard() {
           </Empty>
         )}
         {meetings && meetings.length > 0 && visible.length === 0 && (
-          <Empty icon={<Search size={24} />} title="Sin resultados">Prueba con otro filtro.</Empty>
+          <Empty icon={<Search size={24} />} title="Sin resultados">
+            Prueba con otro filtro.
+          </Empty>
         )}
         <div className="meeting-grid">
           {visible.map((m, i) => (

@@ -1,4 +1,5 @@
 """Contrato HTTP de la API: validaciones, códigos de estado, auditoría y endpoints del frontal."""
+
 import httpx
 import pytest
 from sqlalchemy import select
@@ -44,7 +45,16 @@ def test_create_and_list_meetings_newest_first_with_project_filter(client):
     assert m["status"] == "recording" and m["analysis_status"] == "pending" and m["finished_at"] is None
 
 
-@pytest.mark.parametrize("path", ["/meetings/999", "/meetings/999/progress", "/meetings/999/transcript", "/meetings/999/events", "/requirements/999/history"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/meetings/999",
+        "/meetings/999/progress",
+        "/meetings/999/transcript",
+        "/meetings/999/events",
+        "/requirements/999/history",
+    ],
+)
 def test_unknown_ids_are_404(client, path):
     assert client.get(path).status_code == 404
 
@@ -101,7 +111,10 @@ def test_transcript_json_and_markdown(client):
     client.post(f"/meetings/{mid}/finish")
     drain()
     segs = client.get(f"/meetings/{mid}/transcript", params={"format": "json"}).json()
-    assert [(s["text"], s["source"], s["low_confidence"]) for s in segs] == [("hola", "mic", False), ("ruido", "mic", True)]
+    assert [(s["text"], s["source"], s["low_confidence"]) for s in segs] == [
+        ("hola", "mic", False),
+        ("ruido", "mic", True),
+    ]
     md = client.get(f"/meetings/{mid}/transcript")
     assert md.headers["content-type"].startswith("text/markdown")
     assert "# Demo" in md.text and "**Yo:** hola" in md.text
@@ -153,8 +166,15 @@ def test_progress_counts_by_status(client, session):
     chunk.status = "failed"
     session.commit()
     p = client.get(f"/meetings/{mid}/progress").json()
-    assert p == {"chunks_total": 3, "chunks_pending": 2, "chunks_processing": 0, "chunks_done": 0,
-                 "chunks_failed": 1, "segments": 0, "events": 0}
+    assert p == {
+        "chunks_total": 3,
+        "chunks_pending": 2,
+        "chunks_processing": 0,
+        "chunks_done": 0,
+        "chunks_failed": 1,
+        "segments": 0,
+        "events": 0,
+    }
 
 
 def test_audit_log_records_requests_but_not_health(client, anon, session):
@@ -170,14 +190,25 @@ class TestSystem:
         mid = new_meeting(client)
         upload(client, mid, 0, "hola")
         info = client.get("/system").json()
-        assert info == {"whisper_model": "small", "whisper_language": "es", "analyzer": "fake", "ollama_model": "qwen2.5:7b",
-                        "ollama_reachable": False, "ollama_model_installed": False, "queue": 1}
+        assert info == {
+            "whisper_model": "small",
+            "whisper_language": "es",
+            "analyzer": "fake",
+            "ollama_model": "qwen2.5:7b",
+            "ollama_reachable": False,
+            "ollama_model_installed": False,
+            "queue": 1,
+        }
 
     @pytest.mark.parametrize(("names", "installed"), [(["qwen2.5:7b"], True), (["llama3.2:latest"], False)])
     def test_ollama_model_detection(self, client, set_env, monkeypatch, names, installed):
         set_env("MT_ANALYZER", "ollama")
         req = httpx.Request("GET", "http://ollama/api/tags")
-        monkeypatch.setattr(main.httpx, "get", lambda url, timeout: httpx.Response(200, json={"models": [{"name": n} for n in names]}, request=req))
+        monkeypatch.setattr(
+            main.httpx,
+            "get",
+            lambda url, timeout: httpx.Response(200, json={"models": [{"name": n} for n in names]}, request=req),
+        )
         info = client.get("/system").json()
         assert info["ollama_reachable"] is True and info["ollama_model_installed"] is installed
 
@@ -185,7 +216,11 @@ class TestSystem:
         set_env("MT_ANALYZER", "ollama")
         set_env("MT_OLLAMA_MODEL", "llama3.2")
         req = httpx.Request("GET", "http://ollama/api/tags")
-        monkeypatch.setattr(main.httpx, "get", lambda url, timeout: httpx.Response(200, json={"models": [{"name": "llama3.2:latest"}]}, request=req))
+        monkeypatch.setattr(
+            main.httpx,
+            "get",
+            lambda url, timeout: httpx.Response(200, json={"models": [{"name": "llama3.2:latest"}]}, request=req),
+        )
         assert client.get("/system").json()["ollama_model_installed"] is True
 
     def test_ollama_down(self, client, set_env, monkeypatch):

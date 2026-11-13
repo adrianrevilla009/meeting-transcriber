@@ -1,8 +1,7 @@
 import logging
-
-import httpx
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import func, select
@@ -65,7 +64,7 @@ async def audit(request: Request, call_next):
                     )
                 )
                 s.commit()
-        except Exception:  # noqa: BLE001 - la auditoría nunca debe tumbar la petición
+        except Exception:
             log.exception("No se pudo escribir el log de auditoría")
     return response
 
@@ -191,7 +190,9 @@ def finish_meeting(meeting_id: int, session: Session = Depends(get_session)):
 
 
 @app.get("/meetings/{meeting_id}/transcript", dependencies=[Auth])
-def transcript(meeting_id: int, format: str = Query("md", pattern="^(md|json)$"), session: Session = Depends(get_session)):
+def transcript(
+    meeting_id: int, format: str = Query("md", pattern="^(md|json)$"), session: Session = Depends(get_session)
+):
     m = _meeting(session, meeting_id)
     if format == "md":
         return PlainTextResponse(render_markdown(session, m), media_type="text/markdown; charset=utf-8")
@@ -241,7 +242,9 @@ def requirement_history(req_id: int, session: Session = Depends(get_session)):
     r = session.get(Requirement, req_id)
     if not r:
         raise HTTPException(404, "Requisito no encontrado")
-    return RequirementHistory(requirement=r, events=[EventOut.model_validate(e) for e in r.events])
+    return RequirementHistory(
+        requirement=RequirementOut.model_validate(r), events=[EventOut.model_validate(e) for e in r.events]
+    )
 
 
 @app.get("/search", response_model=list[SearchHit], dependencies=[Auth])

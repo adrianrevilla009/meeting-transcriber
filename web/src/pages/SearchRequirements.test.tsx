@@ -51,12 +51,29 @@ describe("Search page", () => {
 describe("Requirements page", () => {
   const routes = {
     "GET /meetings": [meeting({ id: 1, title: "Kickoff" }), meeting({ id: 2, title: "Revisión" })],
-    "GET /requirements": [requirement({ id: 1, title: "Método de pago", project: "pagos" }), requirement({ id: 2, title: "Modo oscuro", project: "web" })],
+    "GET /requirements": [
+      requirement({ id: 1, title: "Método de pago", project: "pagos" }),
+      requirement({ id: 2, title: "Modo oscuro", project: "web" }),
+    ],
     "GET /requirements/1/history": {
       requirement: requirement({ id: 1, title: "Método de pago", project: "pagos" }),
       events: [
-        event({ id: 1, meeting_id: 1, kind: "new_requirement", summary: "Solo tarjeta", quote: "solo con tarjeta", segment_id: 5 }),
-        event({ id: 2, meeting_id: 2, kind: "changed_requirement", summary: "Se añade Bizum", quote: "también Bizum", segment_id: 9 }),
+        event({
+          id: 1,
+          meeting_id: 1,
+          kind: "new_requirement",
+          summary: "Solo tarjeta",
+          quote: "solo con tarjeta",
+          segment_id: 5,
+        }),
+        event({
+          id: 2,
+          meeting_id: 2,
+          kind: "changed_requirement",
+          summary: "Se añade Bizum",
+          quote: "también Bizum",
+          segment_id: 9,
+        }),
       ],
     },
     "GET /requirements/2/history": {
@@ -86,7 +103,10 @@ describe("Requirements page", () => {
     expect(head).toHaveAttribute("aria-expanded", "true");
     const items = document.querySelectorAll(".timeline-item");
     expect(items).toHaveLength(2);
-    expect(within(items[0] as HTMLElement).getByRole("link", { name: "Kickoff" })).toHaveAttribute("href", "/meetings/1?seg=5");
+    expect(within(items[0] as HTMLElement).getByRole("link", { name: "Kickoff" })).toHaveAttribute(
+      "href",
+      "/meetings/1?seg=5",
+    );
     expect(within(items[1] as HTMLElement).getByText("Cambio")).toBeInTheDocument();
     expect(within(items[1] as HTMLElement).getByText("también Bizum")).toBeInTheDocument();
   });
@@ -94,7 +114,10 @@ describe("Requirements page", () => {
   it("filters by project and opens the focused requirement", async () => {
     mockApi(routes);
     renderApp(<Requirements />, { route: "/requirements?focus=2", path: "/requirements" });
-    expect((await screen.findByRole("heading", { name: "Modo oscuro" })).closest("button")).toHaveAttribute("aria-expanded", "true");
+    expect((await screen.findByRole("heading", { name: "Modo oscuro" })).closest("button")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await userEvent.click(screen.getByRole("button", { name: "#pagos" }));
     expect(screen.queryByRole("heading", { name: "Modo oscuro" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Método de pago" })).toBeInTheDocument();

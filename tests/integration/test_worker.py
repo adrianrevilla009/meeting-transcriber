@@ -1,4 +1,5 @@
 """Worker + base de datos: ciclo de vida de trozos y reuniones, fallos, retención y análisis."""
+
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -130,7 +131,11 @@ class TestAnalysisRules:
         return mid, client.get(f"/meetings/{mid}/events").json()
 
     def test_unknown_kind_is_rejected(self, client):
-        _, events = self._run(client, "Hay que migrar la base de datos.", [Item(kind="chiste", summary="x", quote="migrar la base de datos")])
+        _, events = self._run(
+            client,
+            "Hay que migrar la base de datos.",
+            [Item(kind="chiste", summary="x", quote="migrar la base de datos")],
+        )
         assert events == []
 
     def test_duplicates_from_overlapping_windows_are_collapsed(self, client):
@@ -144,23 +149,46 @@ class TestAnalysisRules:
         assert events[0]["timestamp"] == 10.0  # tercer segmento (FakeTranscriber: 5 s por línea)
 
     def test_open_questions_do_not_create_requirements(self, client, session):
-        self._run(client, "¿Necesitamos soporte para dólares?", [Item(kind="open_question", requirement="Divisas", summary="Dólares", quote="soporte para dólares")])
+        self._run(
+            client,
+            "¿Necesitamos soporte para dólares?",
+            [Item(kind="open_question", requirement="Divisas", summary="Dólares", quote="soporte para dólares")],
+        )
         assert session.query(Requirement).count() == 0
 
     def test_similar_requirement_names_merge_within_project_only(self, client, session):
         t = "Queremos pagar con tarjeta."
-        self._run(client, t, [Item(kind="new_requirement", requirement="Método de pago", summary="a", quote="pagar con tarjeta")], project="pagos")
-        self._run(client, t, [Item(kind="changed_requirement", requirement="metodo de pago", summary="b", quote="pagar con tarjeta")], project="pagos")
-        self._run(client, t, [Item(kind="new_requirement", requirement="Método de pago", summary="c", quote="pagar con tarjeta")], project="otro")
+        self._run(
+            client,
+            t,
+            [Item(kind="new_requirement", requirement="Método de pago", summary="a", quote="pagar con tarjeta")],
+            project="pagos",
+        )
+        self._run(
+            client,
+            t,
+            [Item(kind="changed_requirement", requirement="metodo de pago", summary="b", quote="pagar con tarjeta")],
+            project="pagos",
+        )
+        self._run(
+            client,
+            t,
+            [Item(kind="new_requirement", requirement="Método de pago", summary="c", quote="pagar con tarjeta")],
+            project="otro",
+        )
         reqs = session.scalars(select(Requirement).order_by(Requirement.id)).all()
         assert [(r.project, len(r.events)) for r in reqs] == [("pagos", 2), ("otro", 1)]
 
     def test_different_requirements_stay_separate(self, client, session):
         text = "Queremos pagar con tarjeta.\nY un modo oscuro en la web."
-        self._run(client, text, [
-            Item(kind="new_requirement", requirement="Método de pago", summary="a", quote="pagar con tarjeta"),
-            Item(kind="new_requirement", requirement="Modo oscuro", summary="b", quote="un modo oscuro en la web"),
-        ])
+        self._run(
+            client,
+            text,
+            [
+                Item(kind="new_requirement", requirement="Método de pago", summary="a", quote="pagar con tarjeta"),
+                Item(kind="new_requirement", requirement="Modo oscuro", summary="b", quote="un modo oscuro en la web"),
+            ],
+        )
         assert session.query(Requirement).count() == 2
 
 
@@ -183,3 +211,33 @@ def test_segments_store_confidence_metrics(client, session):
     assert [s.low_confidence for s in segs] == [False, True]
     assert all(s.avg_logprob is not None and s.no_speech_prob is not None for s in segs)
     assert session.get(Meeting, mid).status == "recording"
+
+
+def test_chunk_whose_audio_was_already_deleted_fails_cleanly(client, session):
+    mid = new_meeting(client)
+    upload(client, mid, 0, "hola")
+    chunk = session.scalars(select(Chunk)).one()
+    chunk.path = None
+    session.commit()
+    client.post(f"/meetings/{mid}/finish")
+    drain()
+    session.refresh(chunk)
+    assert chunk.status == "failed" and "ya no existe" in chunk.error
+    assert client.get(f"/meetings/{mid}").json()["status"] == "done"
+
+
+def test_meeting_deleted_while_analysis_fails_does_not_crash_worker(client, monkeypatch):
+    def delete_then_fail(self, window):
+        from app.db import session_factory
+
+        with session_factory()() as s:
+            s.delete(s.get(Meeting, mid))
+            s.commit()
+        raise RuntimeError("Ollama caído")
+
+    monkeypatch.setattr(FakeAnalyzer, "extract", delete_then_fail)
+    mid = new_meeting(client)
+    upload(client, mid, 0, "hola")
+    client.post(f"/meetings/{mid}/finish")
+    drain()  # no debe lanzar
+    assert client.get(f"/meetings/{mid}").status_code == 404

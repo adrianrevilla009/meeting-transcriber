@@ -1,4 +1,5 @@
 """Utilidades compartidas por los tests de integración."""
+
 from app.db import session_factory
 from app.workers.worker import run_once
 

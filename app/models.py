@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -8,7 +8,7 @@ from app.db import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class MeetingStatus(str, enum.Enum):
@@ -38,9 +38,7 @@ class Meeting(Base):
 
     chunks: Mapped[list["Chunk"]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
     segments: Mapped[list["Segment"]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
-    events: Mapped[list["RequirementEvent"]] = relationship(
-        back_populates="meeting", cascade="all, delete-orphan"
-    )
+    events: Mapped[list["RequirementEvent"]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
 
 
 class Chunk(Base):
