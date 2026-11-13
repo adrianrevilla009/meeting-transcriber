@@ -18,26 +18,31 @@ def locate_quote(quote: str, segments: list[Segment], min_score: float) -> Segme
     """Devuelve el segmento donde está la cita, o None si no se puede verificar.
 
     Se prueba cada segmento solo y cada par de segmentos consecutivos (citas que cruzan el corte).
+    Un segmento solo tiene prioridad sobre un par: el par (i, i+1) también contiene todo el segmento i+1,
+    y atribuirle la cita a i desplazaría la marca de tiempo a la frase anterior.
     """
     q = normalize(quote)
     if len(q) < 8:
         return None
     norm = [normalize(s.text) for s in segments]
+    pairs = [f"{a} {b}" for a, b in zip(norm, norm[1:])]
 
-    best: tuple[float, int] = (0.0, -1)
     for i, n in enumerate(norm):
         if q in n:
             return segments[i]
+    for i, pair in enumerate(pairs):
+        if q in pair:
+            return segments[i]
+
+    best: tuple[float, int] = (0.0, -1)
+    for i, n in enumerate(norm):
         score = fuzz.partial_ratio(q, n) if len(n) >= len(q) * 0.5 else 0.0
         if score > best[0]:
             best = (score, i)
-        if i + 1 < len(norm):
-            pair = f"{n} {norm[i + 1]}"
-            if q in pair:
-                return segments[i]
-            score = fuzz.partial_ratio(q, pair)
-            if score > best[0]:
-                best = (score, i)
+    for i, pair in enumerate(pairs):
+        score = fuzz.partial_ratio(q, pair)
+        if score > best[0]:  # solo gana si mejora estrictamente a los segmentos sueltos
+            best = (score, i)
     if best[1] >= 0 and best[0] >= min_score:
         return segments[best[1]]
     return None

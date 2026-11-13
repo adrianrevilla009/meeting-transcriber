@@ -1,0 +1,1 @@
+Buenos días a todos. El cliente quiere que la aplicación permita pagar con tarjeta y también con Bizum. Hemos decidido que la primera versión se entregará el quince de diciembre. Todavía no sabemos si hace falta soporte para pagos en dólares.

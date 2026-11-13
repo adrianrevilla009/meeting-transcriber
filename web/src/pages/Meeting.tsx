@@ -129,17 +129,19 @@ function Transcript({ segments, phase, focus }: { segments: Segment[]; phase: Ph
 function Insights({
   meeting,
   events,
+  loading,
   phase,
   reqTitles,
   onJump,
 }: {
   meeting: MeetingT;
   events: MtEvent[];
+  loading: boolean;
   phase: Phase;
   reqTitles: Map<number, string>;
   onJump: (segId: number) => void;
 }) {
-  if (phase === "recording" || phase === "transcribing" || phase === "analyzing") {
+  if (loading || phase === "recording" || phase === "transcribing" || phase === "analyzing") {
     return (
       <div className="insight-grid">
         {KIND_ORDER.map((k) => (
@@ -152,7 +154,12 @@ function Insights({
           </div>
         ))}
         <div className="insight-wait muted">
-          <Brain size={16} /> {phase === "analyzing" ? "La IA está leyendo la transcripción…" : "El análisis empieza al terminar la transcripción."}
+          <Brain size={16} />{" "}
+          {loading
+            ? "Cargando el análisis…"
+            : phase === "analyzing"
+              ? "La IA está leyendo la transcripción…"
+              : "El análisis empieza al terminar la transcripción."}
         </div>
       </div>
     );
@@ -378,7 +385,7 @@ export function Meeting() {
 
       <div className="glass tab-panel">
         {tab === "insights" ? (
-          <Insights meeting={m} events={eventsQ.data ?? []} phase={phase} reqTitles={reqTitles} onJump={jump} />
+          <Insights meeting={m} events={eventsQ.data ?? []} loading={eventsQ.isLoading} phase={phase} reqTitles={reqTitles} onJump={jump} />
         ) : (
           <Transcript segments={segmentsQ.data ?? []} phase={phase} focus={focus} />
         )}

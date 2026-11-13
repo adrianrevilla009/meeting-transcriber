@@ -1,20 +1,5 @@
-from app.db import session_factory
 from app.services.analyzer import FakeAnalyzer, Item
-from app.workers.worker import run_once
-
-
-def upload(client, mid, seq, text, offset=0.0):
-    return client.post(
-        f"/meetings/{mid}/chunks",
-        files={"file": ("c.txt", text.encode(), "text/plain")},
-        data={"seq": seq, "offset_seconds": offset, "source": "system"},
-    )
-
-
-def drain():
-    with session_factory()() as s:
-        while run_once(s):
-            pass
+from tests.helpers import drain, upload
 
 
 def test_auth_required(env):

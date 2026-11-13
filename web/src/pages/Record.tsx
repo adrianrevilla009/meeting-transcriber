@@ -109,6 +109,7 @@ function Setup() {
       <div className="record-orb-wrap rise" style={{ animationDelay: "80ms" }}>
         <button
           className="record-orb"
+          aria-label={starting ? "Preparando…" : "Empezar a grabar"}
           disabled={starting || (!mic && !system)}
           onClick={() => rec.start({ title, project, mic, system })}
         >

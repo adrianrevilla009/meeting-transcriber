@@ -26,11 +26,11 @@ COMPOSE  := docker compose
 SERVICES := db api worker web ollama
 endif
 
-.PHONY: help start open web-dev env check models whisper-model llm-model up down restart logs ps health \
+.PHONY: help start open web-dev test-api test-web test-e2e test-all coverage env check models whisper-model llm-model up down restart logs ps health \
         ollama-check agent-install record meetings transcript events requirements search test clean
 
 help: ## Muestra esta ayuda
-	@grep -E '^[a-zA-Z_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
 
 start: env check models up ollama-check ## TODO en uno: .env, modelos (si faltan), build, arranque y health
 	@echo ""; echo "Listo. Abre $(WEB) (token: MT_API_TOKEN de .env)  ->  make open"
@@ -121,8 +121,34 @@ requirements: ## Requisitos (opcional PROJECT=x)
 search: ## Busca en transcripciones: make search Q="texto"
 	@curl -s -G $(AUTH) --data-urlencode "q=$(Q)" $(API)/search; echo
 
-test: ## Ejecuta los tests en local
-	$(PYTHON) -m pytest
+# ---------- Tests ----------
+# Entorno Python aislado en .venv (requiere uv: https://docs.astral.sh/uv/)
+VENV_PY = $(if $(wildcard .venv/Scripts/python.exe),.venv/Scripts/python,.venv/bin/python)
+
+.venv:
+	uv venv --python 3.12 .venv
+	uv pip install --python .venv -e ".[dev]"
+
+web/node_modules:
+	cd web && npm ci
+
+test: test-api test-web ## Tests rápidos: unit + integración (API) y unit + componentes (web)
+
+test-api: .venv ## Python: unit + integración (SQLite, transcriptor y LLM falsos)
+	$(VENV_PY) -m pytest
+
+test-web: web/node_modules ## Web: unit + componentes con Vitest
+	cd web && npm test
+
+test-e2e: .venv web/node_modules up ## E2E reales: pipeline (Whisper+Ollama+Postgres) y navegador (Playwright)
+	$(VENV_PY) -m pytest -m e2e -v
+	cd web && npx playwright test
+
+test-all: test test-e2e ## Toda la batería
+
+coverage: .venv web/node_modules ## Informes de cobertura (API y web)
+	$(VENV_PY) -m pytest --cov=app --cov-report=term-missing
+	cd web && npm run test:coverage
 
 clean: ## BORRA contenedores y volumenes (BD, audio, modelos Whisper): make clean CONFIRM=yes
 	@[ "$(CONFIRM)" = "yes" ] || { echo "Esto borra todos los datos. Repite con CONFIRM=yes"; exit 1; }

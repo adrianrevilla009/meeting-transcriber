@@ -59,7 +59,7 @@ export function workletModuleUrl(): string {
 }
 
 /** Diezmado con media por ventana (filtro paso bajo simple) o interpolación si sube la tasa. */
-function resample(x: Float32Array, from: number, to: number): Float32Array {
+export function resample(x: Float32Array, from: number, to: number): Float32Array {
   if (from === to) return x;
   const ratio = from / to;
   const n = Math.floor(x.length / ratio);
@@ -84,7 +84,7 @@ function resample(x: Float32Array, from: number, to: number): Float32Array {
   return out;
 }
 
-function encodeWav(samples: Float32Array, sampleRate: number): Blob {
+export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   const buf = new ArrayBuffer(44 + samples.length * 2);
   const v = new DataView(buf);
   const str = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
@@ -108,23 +108,65 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
+/**
+ * Acumula muestras de una fuente y emite trozos de `chunkSeconds` como WAV 16 kHz.
+ * Sin dependencias de Web Audio: es la parte que decide seq, offsets y cortes.
+ */
+export class ChunkAccumulator {
+  private parts: Float32Array[] = [];
+  private partLen = 0;
+  private chunkStart = 0;
+  private seq = 0;
+
+  constructor(
+    readonly source: Source,
+    private sampleRate: number,
+    private onChunk: (c: AudioChunk) => void,
+    private chunkSeconds = CHUNK_SECONDS,
+  ) {}
+
+  push(d: Float32Array) {
+    this.parts.push(d);
+    this.partLen += d.length;
+    if (this.partLen >= this.chunkSeconds * this.sampleRate) this.emit();
+  }
+
+  /** Emite lo pendiente si dura al menos `minSeconds` (descarta colas de silencio de milisegundos). */
+  flush(minSeconds = 0.5) {
+    if (this.partLen >= minSeconds * this.sampleRate) this.emit();
+  }
+
+  private emit() {
+    if (!this.partLen) return;
+    const all = new Float32Array(this.partLen);
+    let o = 0;
+    for (const p of this.parts) {
+      all.set(p, o);
+      o += p.length;
+    }
+    this.onChunk({
+      seq: this.seq++,
+      source: this.source,
+      offset: this.chunkStart / this.sampleRate,
+      seconds: all.length / this.sampleRate,
+      blob: encodeWav(resample(all, this.sampleRate, TARGET_SR), TARGET_SR),
+    });
+    this.chunkStart += all.length;
+    this.parts = [];
+    this.partLen = 0;
+  }
+}
+
 export class SourceCapture {
   readonly analyser: AnalyserNode;
   private src: MediaStreamAudioSourceNode;
   private node: AudioWorkletNode;
   private sink: GainNode;
-  private parts: Float32Array[] = [];
-  private partLen = 0;
-  private chunkStart = 0;
-  private seq = 0;
+  private acc: ChunkAccumulator;
   private onFinal: (() => void) | null = null;
 
-  constructor(
-    private ctx: AudioContext,
-    stream: MediaStream,
-    readonly source: Source,
-    private onChunk: (c: AudioChunk) => void,
-  ) {
+  constructor(ctx: AudioContext, stream: MediaStream, readonly source: Source, onChunk: (c: AudioChunk) => void) {
+    this.acc = new ChunkAccumulator(source, ctx.sampleRate, onChunk);
     this.src = ctx.createMediaStreamSource(stream);
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 2048;
@@ -136,36 +178,9 @@ export class SourceCapture {
     this.src.connect(this.node);
     this.node.connect(this.sink).connect(ctx.destination);
     this.node.port.onmessage = (e: MessageEvent<{ data: Float32Array; final: boolean }>) => {
-      if (e.data.data.length) this.push(e.data.data);
+      if (e.data.data.length) this.acc.push(e.data.data);
       if (e.data.final) this.onFinal?.();
     };
-  }
-
-  private push(d: Float32Array) {
-    this.parts.push(d);
-    this.partLen += d.length;
-    if (this.partLen >= CHUNK_SECONDS * this.ctx.sampleRate) this.emit();
-  }
-
-  private emit() {
-    if (!this.partLen) return;
-    const all = new Float32Array(this.partLen);
-    let o = 0;
-    for (const p of this.parts) {
-      all.set(p, o);
-      o += p.length;
-    }
-    const sr = this.ctx.sampleRate;
-    this.onChunk({
-      seq: this.seq++,
-      source: this.source,
-      offset: this.chunkStart / sr,
-      seconds: all.length / sr,
-      blob: encodeWav(resample(all, sr, TARGET_SR), TARGET_SR),
-    });
-    this.chunkStart += all.length;
-    this.parts = [];
-    this.partLen = 0;
   }
 
   async stop() {
@@ -174,7 +189,7 @@ export class SourceCapture {
       this.node.port.postMessage("flush");
       setTimeout(resolve, 1500);
     });
-    if (this.partLen >= 0.5 * this.ctx.sampleRate) this.emit();
+    this.acc.flush();
     this.src.disconnect();
     this.node.disconnect();
     this.sink.disconnect();
@@ -200,6 +215,7 @@ export class Uploader {
   constructor(
     private meetingId: number,
     private onStats: (s: UploadStats) => void,
+    private retryBaseMs = 1000,
   ) {}
 
   add(c: AudioChunk) {
@@ -232,7 +248,7 @@ export class Uploader {
           // 4xx (salvo timeouts/limitación) no se arregla reintentando.
           if (e instanceof ApiError && e.status >= 400 && e.status < 500 && ![408, 429].includes(e.status)) break;
           this.update({ retrying: true });
-          await sleep(Math.min(1000 * 2 ** attempt, 15_000));
+          await sleep(Math.min(this.retryBaseMs * 2 ** attempt, 15 * this.retryBaseMs));
         }
       }
       this.queue.shift();

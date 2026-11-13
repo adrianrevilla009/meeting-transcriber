@@ -61,9 +61,23 @@ Todo requiere `Authorization: Bearer <MT_API_TOKEN>` salvo `/health`. Cada petic
 2. Corrige a mano un fragmento y compara: `python scripts/eval_wer.py referencia.txt hipotesis.txt` (requiere `pip install jiwer`).
 3. Ajusta modelo, glosario y umbrales (`MT_MIN_AVG_LOGPROB`, `MT_QUOTE_MIN_SCORE`) con datos.
 
+## Tests
+| Orden | Qué prueba | Necesita |
+|---|---|---|
+| `make test` | Todo lo rápido (las dos filas siguientes) | `uv`, Node |
+| `make test-api` | Python unit + integración: verificador de citas, análisis, worker, todos los endpoints, auditoría (SQLite, transcriptor y LLM falsos) | `uv` |
+| `make test-web` | Vitest: formato, codificación WAV y troceo, subidas con reintento, cliente API y cada pantalla (Testing Library) | Node |
+| `make test-e2e` | Pipeline real (voz → Whisper → Ollama → Postgres, con WER) y navegador real (Playwright graba con un micro falso que reproduce la voz) | stack arrancado, Chrome |
+| `make coverage` | Informes de cobertura | |
+
+El audio de prueba (`tests/fixtures/speech_es.wav`) es voz sintética en español con su guion exacto
+(`speech_es.txt`); se regenera con `powershell -File tests/fixtures/make_speech.ps1`.
+GitHub Actions ejecuta `make test` en cada push; los e2e se lanzan en local porque necesitan los modelos.
+
 ## Desarrollo
 ```bash
-pip install -e ".[dev]" && pytest
+make test        # crea .venv con uv e instala dependencias la primera vez
+make web-dev     # frontal con recarga en caliente
 ```
 Variables de entorno `MT_*` en `app/config.py`.
 

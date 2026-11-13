@@ -64,10 +64,28 @@ class OllamaAnalyzer:
         content = resp.json()["message"]["content"]
         try:
             data = json.loads(content)
-            return [Item(**i) for i in data.get("items", [])]
-        except (json.JSONDecodeError, ValidationError, TypeError, AttributeError):
-            log.warning("Respuesta del LLM no válida, se descarta la ventana")
+        except json.JSONDecodeError:
+            log.warning("Respuesta del LLM no es JSON, se descarta la ventana")
             return []
+        raw = data.get("items", []) if isinstance(data, dict) else []
+        if not isinstance(raw, list):
+            log.warning("Respuesta del LLM sin lista de items, se descarta la ventana")
+            return []
+        # Se valida elemento a elemento: uno mal formado no debe tirar los demás.
+        items, dropped = [], 0
+        for i in raw:
+            if isinstance(i, dict) and "kind" not in i:
+                # Error típico de modelos pequeños: el tipo como clave ({"decision": "...", ...}).
+                kind = next((k for k in KINDS if k in i), None)
+                if kind:
+                    i = {**i, "kind": kind}
+            try:
+                items.append(Item.model_validate(i))
+            except ValidationError:
+                dropped += 1
+        if dropped:
+            log.warning("Se descartan %s elementos mal formados del LLM", dropped)
+        return items
 
 
 class FakeAnalyzer:
