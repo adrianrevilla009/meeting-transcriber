@@ -2,6 +2,14 @@
 
 Transcripción local y privada de reuniones. Nada sale de tu máquina/red: Whisper y el LLM (Ollama) corren en local.
 
+## Estructura del repositorio
+```
+backend/   API, worker, agente de captura, scripts y tests de Python (Dockerfile y pyproject propios)
+web/       frontal React
+docker-compose.yml, Makefile, .env   orquestación común
+```
+Cada proyecto del portfolio vive en su propia carpeta de primer nivel con sus tests y su Dockerfile.
+
 ## Arquitectura
 ```
 [Windows] capture_agent.py ──HTTP──▶ api (FastAPI) ──▶ Postgres (datos + cola SKIP LOCKED)
@@ -39,7 +47,7 @@ Desarrollo del frontal con recarga en caliente: `make web-dev` (http://localhost
 ## Captura (Windows, alternativa por línea de comandos)
 ```powershell
 pip install PyAudioWPatch numpy soundfile requests
-python agent/capture_agent.py --token TU_TOKEN --title "Kickoff" --project pagos
+python backend/agent/capture_agent.py --token TU_TOKEN --title "Kickoff" --project pagos
 # Ctrl+C para terminar → el worker transcribe, analiza y exporta
 ```
 Graba tu micro (`mic`, aparece como "Yo") y el audio del sistema (`system`, "Otros") por separado.
@@ -54,10 +62,28 @@ Graba tu micro (`mic`, aparece como "Yo") y el audio del sistema (`system`, "Otr
 
 Todo requiere `Authorization: Bearer <MT_API_TOKEN>` salvo `/health`. Cada petición queda en `audit_log`.
 
+## Mejorar la calidad (Whisper y resumen)
+Todo se controla con variables `MT_*` en `.env`; tras cambiarlas, `make up` (o `docker compose up -d`) y,
+si cambias el modelo, descárgalo (`make models`). De más a menos impacto:
+
+| Qué falla | Palanca | Variable | Coste |
+|---|---|---|---|
+| Nombres propios, siglas o jerga mal escritos | Glosario: va a Whisper (`initial_prompt`) y al LLM, que corrige los términos deformados | `MT_GLOSSARY="Zoltrabek, ProyectoX"` | Ninguno |
+| Transcripción con muchos errores | Modelo Whisper mayor: `small` → `medium` (`large-v3` solo con GPU) | `MT_WHISPER_MODEL` | ~3× más lento en CPU |
+| Errores puntuales de palabras | Búsqueda en haz más amplia (por defecto 5; 1 = voraz) | `MT_WHISPER_BEAM_SIZE` | Algo más lento |
+| Resumen que omite o inventa | LLM mayor: `qwen2.5:7b` → `qwen2.5:14b` (`make llm-model` tras cambiarlo) | `MT_OLLAMA_MODEL` | Más RAM y tiempo |
+| Resumen que se corta o pierde el inicio | Contexto del LLM (el de Ollama por defecto recorta) | `MT_OLLAMA_NUM_CTX` (8192) | Más RAM |
+| Resumen con poco detalle en reuniones largas | Trozos de transcripción más grandes (menos fusiones) | `MT_ANALYSIS_WINDOW_CHARS` (6000) | Un 7b pierde detalle si son muy grandes |
+
+Aplicado ya por defecto: `beam_size=5`, VAD, glosario también en el LLM y contexto de 8192 tokens.
+Lo que más pesa y no es un parámetro: la calidad del audio. Usa auriculares (el micro no debe recoger el audio del
+sistema) y comprueba que el nivel no sea bajo. En CPU de 16 GB, `medium` + `qwen2.5:7b` es el techo razonable.
+Para medir el efecto de cada cambio: `scripts/eval_wer.py` (ver abajo).
+
 ## Medir la fiabilidad real
 1. Graba 3-5 reuniones con audio retenido (`MT_AUDIO_RETENTION_DAYS=30`).
-2. Corrige a mano un fragmento y compara: `python scripts/eval_wer.py referencia.txt hipotesis.txt` (requiere `pip install jiwer`).
-3. Ajusta modelo, glosario y umbrales (`MT_MIN_AVG_LOGPROB`, `MT_QUOTE_MIN_SCORE`) con datos.
+2. Corrige a mano un fragmento y compara: `python backend/scripts/eval_wer.py referencia.txt hipotesis.txt` (requiere `pip install jiwer`).
+3. Ajusta modelo, glosario y umbrales (`MT_MIN_AVG_LOGPROB`) con datos.
 
 ## Tests
 | Orden | Qué prueba | Necesita |
@@ -68,16 +94,16 @@ Todo requiere `Authorization: Bearer <MT_API_TOKEN>` salvo `/health`. Cada petic
 | `make test-e2e` | Pipeline real (voz → Whisper → Ollama → Postgres, con WER) y navegador real (Playwright graba con un micro falso que reproduce la voz) | stack arrancado, Chrome |
 | `make coverage` | Informes de cobertura | |
 
-El audio de prueba (`tests/fixtures/speech_es.wav`) es voz sintética en español con su guion exacto
-(`speech_es.txt`); se regenera con `powershell -File tests/fixtures/make_speech.ps1`.
+El audio de prueba (`backend/tests/fixtures/speech_es.wav`) es voz sintética en español con su guion exacto
+(`speech_es.txt`); se regenera con `powershell -File backend/tests/fixtures/make_speech.ps1`.
 GitHub Actions ejecuta `make test` en cada push; los e2e se lanzan en local porque necesitan los modelos.
 
 ## Desarrollo
 ```bash
-make test        # crea .venv con uv e instala dependencias la primera vez
+make test        # crea backend/.venv con uv e instala dependencias la primera vez
 make web-dev     # frontal con recarga en caliente
 ```
-Variables de entorno `MT_*` en `app/config.py`.
+Variables de entorno `MT_*` en `backend/app/config.py`.
 
 ## Pendiente / siguientes pasos
 - Migraciones con Alembic (ahora `create_all` al arrancar).

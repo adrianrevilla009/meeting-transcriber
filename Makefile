@@ -107,7 +107,7 @@ agent-install: ## Instala dependencias del agente de captura (Windows)
 	$(PYTHON) -m pip install PyAudioWPatch numpy soundfile requests
 
 record: ## Graba una reunion: make record TITLE="Kickoff" PROJECT=pagos (Ctrl+C para terminar)
-	$(PYTHON) agent/capture_agent.py --api $(API) --token "$(MT_API_TOKEN)" --title "$(TITLE)" --project "$(PROJECT)"
+	$(PYTHON) backend/agent/capture_agent.py --api $(API) --token "$(MT_API_TOKEN)" --title "$(TITLE)" --project "$(PROJECT)"
 
 meetings: ## Lista reuniones
 	@curl -s $(AUTH) $(API)/meetings; echo
@@ -119,32 +119,33 @@ search: ## Busca en transcripciones: make search Q="texto"
 	@curl -s -G $(AUTH) --data-urlencode "q=$(Q)" $(API)/search; echo
 
 # ---------- Tests ----------
-# Entorno Python aislado en .venv (requiere uv: https://docs.astral.sh/uv/)
-VENV_PY = $(if $(wildcard .venv/Scripts/python.exe),.venv/Scripts/python,.venv/bin/python)
+# Entorno Python aislado en backend/.venv (requiere uv: https://docs.astral.sh/uv/)
+# Los comandos de Python se ejecutan desde backend/ (ahí viven pyproject.toml y los tests).
+VENV_PY = $(if $(wildcard backend/.venv/Scripts/python.exe),.venv/Scripts/python,.venv/bin/python)
 
-.venv:
-	uv venv --python 3.12 .venv
-	uv pip install --python .venv -e ".[dev]"
+backend/.venv:
+	uv venv --python 3.12 backend/.venv
+	uv pip install --python backend/.venv -e "backend[dev]"
 
 web/node_modules:
 	cd web && npm ci
 
 test: test-api test-web ## Tests rápidos: unit + integración (API) y unit + componentes (web)
 
-test-api: .venv ## Python: unit + integración (SQLite, transcriptor y LLM falsos)
-	$(VENV_PY) -m pytest
+test-api: backend/.venv ## Python: unit + integración (SQLite, transcriptor y LLM falsos)
+	cd backend && $(VENV_PY) -m pytest
 
 test-web: web/node_modules ## Web: unit + componentes con Vitest
 	cd web && npm test
 
-test-e2e: .venv web/node_modules up ## E2E reales: pipeline (Whisper+Ollama+Postgres) y navegador (Playwright)
-	$(VENV_PY) -m pytest -m e2e -v
+test-e2e: backend/.venv web/node_modules up ## E2E reales: pipeline (Whisper+Ollama+Postgres) y navegador (Playwright)
+	cd backend && $(VENV_PY) -m pytest -m e2e -v
 	cd web && npx playwright test
 
 test-all: test test-e2e ## Toda la batería
 
-coverage: .venv web/node_modules ## Informes de cobertura (API y web)
-	$(VENV_PY) -m pytest --cov=app --cov-report=term-missing
+coverage: backend/.venv web/node_modules ## Informes de cobertura (API y web)
+	cd backend && $(VENV_PY) -m pytest --cov=app --cov-report=term-missing
 	cd web && npm run test:coverage
 
 clean: ## BORRA contenedores y volumenes (BD, audio, modelos Whisper): make clean CONFIRM=yes

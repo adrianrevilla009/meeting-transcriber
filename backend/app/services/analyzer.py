@@ -28,6 +28,14 @@ dato relevante (cifras, fechas, nombres, acuerdos, tareas, dudas). No inventes n
 Escribe en español, con párrafos breves y listas con "- " cuando ayude. Sin encabezados, introducción ni despedida."""
 
 
+def _with_glossary(prompt: str) -> str:
+    """Añade los términos propios para que el LLM corrija nombres que Whisper deforma."""
+    glossary = get_settings().glossary.strip()
+    if not glossary:
+        return prompt
+    return f"{prompt}\n- Términos del proyecto (escríbelos exactamente así si aparecen, aunque la transcripción los deforme): {glossary}."
+
+
 class Analyzer(Protocol):
     def summarize(self, transcript_window: str) -> str: ...
 
@@ -44,7 +52,7 @@ class OllamaAnalyzer:
             json={
                 "model": self.s.ollama_model,
                 "stream": False,
-                "options": {"temperature": 0},
+                "options": {"temperature": 0, "num_ctx": self.s.ollama_num_ctx},
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
@@ -56,11 +64,11 @@ class OllamaAnalyzer:
         return str(resp.json()["message"]["content"]).strip()
 
     def summarize(self, transcript_window: str) -> str:
-        return self._chat(SYSTEM_PROMPT, f"Transcripción:\n\n{transcript_window}")
+        return self._chat(_with_glossary(SYSTEM_PROMPT), f"Transcripción:\n\n{transcript_window}")
 
     def merge(self, partial_summaries: list[str]) -> str:
         parts = "\n\n".join(f"--- Parte {i} ---\n{p}" for i, p in enumerate(partial_summaries, 1))
-        return self._chat(MERGE_PROMPT, parts)
+        return self._chat(_with_glossary(MERGE_PROMPT), parts)
 
 
 class FakeAnalyzer:

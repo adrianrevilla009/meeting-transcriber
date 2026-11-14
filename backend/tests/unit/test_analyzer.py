@@ -48,9 +48,27 @@ def test_summarize_request_is_deterministic_with_system_prompt(ollama):
     assert req["url"].endswith("/api/chat")
     body = req["json"]
     assert body["model"] == "qwen-test" and body["stream"] is False
-    assert body["options"]["temperature"] == 0
+    assert body["options"]["temperature"] == 0 and body["options"]["num_ctx"] == 8192
     assert body["messages"][0]["role"] == "system" and "TODO lo relevante" in body["messages"][0]["content"]
     assert "Transcripción de prueba" in body["messages"][1]["content"]
+
+
+def test_glossary_goes_to_the_system_prompt_of_summary_and_merge(ollama, set_env):
+    set_env("MT_GLOSSARY", "Zoltrabek, Quillfeather")
+    respond, calls = ollama
+    respond("ok")
+    OllamaAnalyzer().summarize("x")
+    OllamaAnalyzer().merge(["a", "b"])
+    for call in calls:
+        assert "Zoltrabek, Quillfeather" in call["json"]["messages"][0]["content"]
+
+
+def test_num_ctx_is_configurable(ollama, set_env):
+    set_env("MT_OLLAMA_NUM_CTX", "16384")
+    respond, calls = ollama
+    respond("ok")
+    OllamaAnalyzer().summarize("x")
+    assert calls[0]["json"]["options"]["num_ctx"] == 16384
 
 
 def test_summary_is_stripped(ollama):

@@ -1,6 +1,6 @@
 # Red 'backend' interna (sin salida a Internet). Solo la API se publica, y solo en 127.0.0.1.
 x-app: &app
-  build: .
+  build: ./backend
   env_file: .env
   environment:
     MT_DATABASE_URL: postgresql+psycopg://mt:${POSTGRES_PASSWORD}@db:5432/mt

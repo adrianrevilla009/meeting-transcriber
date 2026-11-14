@@ -40,6 +40,7 @@ class FasterWhisperTranscriber:
             str(path),
             language=self.s.whisper_language,
             vad_filter=True,  # evita alucinaciones en silencios
+            beam_size=self.s.whisper_beam_size,
             initial_prompt=self.prompt,
             condition_on_previous_text=False,  # evita bucles de repetición
         )

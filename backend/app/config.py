@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     whisper_model: str = "small"  # small/medium en CPU; large-v3 si hay GPU
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
+    whisper_beam_size: int = 5  # más alto = algo más preciso y más lento (1 = voraz)
     whisper_language: str = "es"
     whisper_models_dir: Path = Path("./data/models")
     glossary: str = ""  # términos separados por coma; va al initial_prompt
@@ -40,6 +41,7 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"
     ollama_timeout: float = 900.0
+    ollama_num_ctx: int = 8192  # ventana de contexto del LLM; el valor por defecto de Ollama (2-4k) recorta
     analysis_window_chars: int = 6000
 
 

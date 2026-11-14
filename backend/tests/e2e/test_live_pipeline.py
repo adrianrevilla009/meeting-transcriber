@@ -28,7 +28,7 @@ TIMEOUT_S = int(os.environ.get("MT_E2E_TIMEOUT", "420"))
 def _token() -> str:
     if tok := os.environ.get("MT_API_TOKEN"):
         return tok
-    env = ROOT / ".env"
+    env = ROOT.parent / ".env"
     if env.exists():
         for line in env.read_text(encoding="utf-8").splitlines():
             if line.startswith("MT_API_TOKEN="):
