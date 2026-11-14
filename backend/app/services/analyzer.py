@@ -33,7 +33,8 @@ def _with_glossary(prompt: str) -> str:
     glossary = get_settings().glossary.strip()
     if not glossary:
         return prompt
-    return f"{prompt}\n- Términos del proyecto (escríbelos exactamente así si aparecen, aunque la transcripción los deforme): {glossary}."
+    hint = "Términos del proyecto (escríbelos exactamente así si aparecen, aunque la transcripción los deforme)"
+    return f"{prompt}\n- {hint}: {glossary}."
 
 
 class Analyzer(Protocol):
