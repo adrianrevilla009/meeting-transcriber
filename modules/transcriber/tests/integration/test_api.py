@@ -4,11 +4,11 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from transcriber.adapters.inbound.api import app as api_app
-from transcriber.adapters.outbound.analysis.fake import FakeAnalyzer
-from transcriber.adapters.outbound.analysis import ollama as ollama_adapter
-from transcriber.domain.models import AuditLog, Chunk
 from tests.helpers import drain, new_meeting, upload
+from transcriber.adapters.inbound.api import app as api_app
+from transcriber.adapters.outbound.analysis import ollama as ollama_adapter
+from transcriber.adapters.outbound.analysis.fake import FakeAnalyzer
+from transcriber.domain.models import AuditLog, Chunk
 
 PROTECTED = [
     ("get", "/meetings"),

@@ -4,11 +4,11 @@ from datetime import timedelta
 
 from sqlalchemy import select
 
+from tests.helpers import drain, new_meeting, upload
 from transcriber.adapters.outbound.analysis.fake import FakeAnalyzer
 from transcriber.application.pipeline import run_once
 from transcriber.bootstrap import get_runtime
 from transcriber.domain.models import Chunk, Meeting, Segment, utcnow
-from tests.helpers import drain, new_meeting, upload
 
 
 def test_meeting_waits_until_all_chunks_are_transcribed(client, session):

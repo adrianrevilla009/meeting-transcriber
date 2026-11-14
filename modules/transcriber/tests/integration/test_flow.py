@@ -1,5 +1,5 @@
-from transcriber.adapters.outbound.analysis.fake import FakeAnalyzer
 from tests.helpers import drain, upload
+from transcriber.adapters.outbound.analysis.fake import FakeAnalyzer
 
 
 def test_auth_required(env):

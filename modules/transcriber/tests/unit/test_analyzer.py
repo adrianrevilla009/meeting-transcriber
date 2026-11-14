@@ -109,13 +109,13 @@ def _segs(texts):
 
 def test_windows_fit_in_budget_and_overlap_two_segments():
     texts = [f"frase número {i:02d} " + "x" * 30 for i in range(20)]
-    windows = windows(_segs(texts), max_chars=200)
-    assert len(windows) > 1
-    for w in windows:
+    parts = windows(_segs(texts), max_chars=200)
+    assert len(parts) > 1
+    for w in parts:
         assert len(w.replace("\n", "")) <= 200 + 50  # un segmento puede desbordar el último hueco
-    for a, b in itertools.pairwise(windows):
+    for a, b in itertools.pairwise(parts):
         assert a.splitlines()[-2:] == b.splitlines()[:2]  # solape para no cortar frases
-    joined = "\n".join(windows)
+    joined = "\n".join(parts)
     assert all(t in joined for t in texts)  # no se pierde nada
 
 

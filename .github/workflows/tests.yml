@@ -27,12 +27,15 @@ jobs:
           cache: pip
           cache-dependency-path: modules/transcriber/pyproject.toml
       - run: pip install -e ".[dev]"
-      - run: ruff check .
+      - run: |
+          for c in "ruff check ." "mypy" "lint-imports" "bandit -q -r src -c pyproject.toml"; do $c || echo "$c" >> failed.txt; done 2>&1 | tee out.txt
+          test ! -f failed.txt
+      - name: Anotar fallos
+        if: failure()
+        run: |
+          { cat failed.txt; grep -vE '^(Found|All checks|Success|No issues)' out.txt | head -40; } | cut -c1-300 | while IFS= read -r l; do echo "::error::$l"; done
       - run: ruff format --check .
         continue-on-error: true # informativo hasta que se formatee todo el código
-      - run: mypy
-      - run: lint-imports
-      - run: bandit -q -r src -c pyproject.toml
       - run: pip-audit
         continue-on-error: true # depende de avisos externos; no debe bloquear
 
