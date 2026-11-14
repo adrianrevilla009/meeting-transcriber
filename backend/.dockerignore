@@ -1,5 +1,0 @@
-# Solo pyproject.toml y app/ entran en la imagen de la API; lo demás no debe viajar al contexto.
-*
-!pyproject.toml
-!app/
-**/__pycache__

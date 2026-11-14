@@ -43,7 +43,7 @@ open: ## Abre el frontal en el navegador
 	@explorer "$(WEB)" || true
 
 web-dev: ## Frontal en modo desarrollo con recarga en caliente (http://localhost:5173)
-	cd web && npm install && npm run dev
+	cd modules/transcriber/web && npm install && npm run dev
 
 env: ## Crea .env desde .env.example si no existe
 	@if [ ! -f .env ]; then cp .env.example .env; echo ".env creado: edita POSTGRES_PASSWORD y MT_API_TOKEN y vuelve a lanzar make start"; exit 1; fi
@@ -107,7 +107,7 @@ agent-install: ## Instala dependencias del agente de captura (Windows)
 	$(PYTHON) -m pip install PyAudioWPatch numpy soundfile requests
 
 record: ## Graba una reunion: make record TITLE="Kickoff" PROJECT=pagos (Ctrl+C para terminar)
-	$(PYTHON) backend/agent/capture_agent.py --api $(API) --token "$(MT_API_TOKEN)" --title "$(TITLE)" --project "$(PROJECT)"
+	$(PYTHON) modules/transcriber/agent/capture_agent.py --api $(API) --token "$(MT_API_TOKEN)" --title "$(TITLE)" --project "$(PROJECT)"
 
 meetings: ## Lista reuniones
 	@curl -s $(AUTH) $(API)/meetings; echo
@@ -119,34 +119,34 @@ search: ## Busca en transcripciones: make search Q="texto"
 	@curl -s -G $(AUTH) --data-urlencode "q=$(Q)" $(API)/search; echo
 
 # ---------- Tests ----------
-# Entorno Python aislado en backend/.venv (requiere uv: https://docs.astral.sh/uv/)
-# Los comandos de Python se ejecutan desde backend/ (ahí viven pyproject.toml y los tests).
-VENV_PY = $(if $(wildcard backend/.venv/Scripts/python.exe),.venv/Scripts/python,.venv/bin/python)
+# Entorno Python aislado en modules/transcriber/.venv (requiere uv: https://docs.astral.sh/uv/)
+# Los comandos de Python se ejecutan desde modules/transcriber/ (ahí viven pyproject.toml y los tests).
+VENV_PY = $(if $(wildcard modules/transcriber/.venv/Scripts/python.exe),.venv/Scripts/python,.venv/bin/python)
 
-backend/.venv:
-	uv venv --python 3.12 backend/.venv
-	uv pip install --python backend/.venv -e "backend[dev]"
+modules/transcriber/.venv:
+	uv venv --python 3.12 modules/transcriber/.venv
+	uv pip install --python modules/transcriber/.venv -e "modules/transcriber[dev]"
 
-web/node_modules:
-	cd web && npm ci
+modules/transcriber/web/node_modules:
+	cd modules/transcriber/web && npm ci
 
 test: test-api test-web ## Tests rápidos: unit + integración (API) y unit + componentes (web)
 
-test-api: backend/.venv ## Python: unit + integración (SQLite, transcriptor y LLM falsos)
-	cd backend && $(VENV_PY) -m pytest
+test-api: modules/transcriber/.venv ## Python: unit + integración (SQLite, transcriptor y LLM falsos)
+	cd modules/transcriber && $(VENV_PY) -m pytest
 
-test-web: web/node_modules ## Web: unit + componentes con Vitest
-	cd web && npm test
+test-web: modules/transcriber/web/node_modules ## Web: unit + componentes con Vitest
+	cd modules/transcriber/web && npm test
 
-test-e2e: backend/.venv web/node_modules up ## E2E reales: pipeline (Whisper+Ollama+Postgres) y navegador (Playwright)
-	cd backend && $(VENV_PY) -m pytest -m e2e -v
-	cd web && npx playwright test
+test-e2e: modules/transcriber/.venv modules/transcriber/web/node_modules up ## E2E reales: pipeline (Whisper+Ollama+Postgres) y navegador (Playwright)
+	cd modules/transcriber && $(VENV_PY) -m pytest -m e2e -v
+	cd modules/transcriber/web && npx playwright test
 
 test-all: test test-e2e ## Toda la batería
 
-coverage: backend/.venv web/node_modules ## Informes de cobertura (API y web)
-	cd backend && $(VENV_PY) -m pytest --cov=app --cov-report=term-missing
-	cd web && npm run test:coverage
+coverage: modules/transcriber/.venv modules/transcriber/web/node_modules ## Informes de cobertura (API y web)
+	cd modules/transcriber && $(VENV_PY) -m pytest --cov=transcriber --cov-report=term-missing
+	cd modules/transcriber/web && npm run test:coverage
 
 clean: ## BORRA contenedores y volumenes (BD, audio, modelos Whisper): make clean CONFIRM=yes
 	@[ "$(CONFIRM)" = "yes" ] || { echo "Esto borra todos los datos. Repite con CONFIRM=yes"; exit 1; }

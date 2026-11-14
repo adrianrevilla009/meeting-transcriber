@@ -1,6 +1,6 @@
 # Red 'backend' interna (sin salida a Internet). Solo la API se publica, y solo en 127.0.0.1.
 x-app: &app
-  build: ./backend
+  build: ./modules/transcriber
   env_file: .env
   environment:
     MT_DATABASE_URL: postgresql+psycopg://mt:${POSTGRES_PASSWORD}@db:5432/mt
@@ -28,13 +28,13 @@ services:
 
   worker:
     <<: *app
-    command: ["python", "-m", "app.workers.worker"]
+    command: ["python", "-m", "transcriber.bootstrap.worker"]
     networks: [backend]
     restart: unless-stopped
 
   # Frontal React servido por nginx; /api se redirige a la API (sin CORS). Solo en localhost.
   web:
-    build: ./web
+    build: ./modules/transcriber/web
     ports: ["127.0.0.1:3000:8080"]
     networks: [edge]
     depends_on: [api]
@@ -50,7 +50,7 @@ services:
   models:
     <<: *app
     profiles: [setup]
-    command: ["python", "-m", "app.workers.download_models"]
+    command: ["python", "-m", "transcriber.bootstrap.download_models"]
     networks: [edge]
   ollama-pull:
     image: ollama/ollama:latest

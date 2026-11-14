@@ -1,0 +1,96 @@
+[project]
+name = "meeting-transcriber"
+version = "0.1.0"
+description = "Transcripción local y privada de reuniones (FastAPI + faster-whisper + Postgres)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
+    "psycopg[binary]>=3.2",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+whisper = ["faster-whisper>=1.0", "av>=11,<17"]  # av 17+ quitó metadata_errors, que usa faster-whisper
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.8", "mypy>=1.13", "bandit>=1.8", "pip-audit>=2.7", "import-linter>=2.0"]
+agent = ["PyAudioWPatch>=0.2.12", "numpy", "soundfile", "requests"]
+
+# Layout src/: solo el paquete transcriber es instalable (agent/, scripts/, web/ y tests/ no se empaquetan).
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["transcriber*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Los e2e necesitan el stack arrancado (make start): se lanzan aparte con `pytest -m e2e`.
+addopts = "-m 'not e2e'"
+markers = [
+    "e2e: pipeline real contra el stack en marcha (Whisper + Ollama + Postgres)",
+]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/W estilo, F errores, I imports, B bugs probables, UP sintaxis moderna, S seguridad, SIM simplificaciones
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # el código está en español: tildes y comillas tipográficas son intencionadas
+    "UP042",  # (str, Enum) se mantiene por compatibilidad con SQLAlchemy Enum
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Idioma estándar de FastAPI: dependencias y parámetros declarados como valores por defecto.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Query", "fastapi.Header"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "E501"]  # assert, tokens de prueba y datos literales largos
+"scripts/**" = ["S"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["transcriber"]
+mypy_path = "src"
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "web"]
+
+# Arquitectura hexagonal (ver docs/ARCHITECTURE.md). Se comprueba con `lint-imports`.
+[tool.importlinter]
+root_package = "transcriber"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Capas: bootstrap > adapters > application > domain"
+type = "layers"
+layers = [
+    "transcriber.bootstrap",
+    "transcriber.adapters",
+    "transcriber.application",
+    "transcriber.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Dominio y aplicación no conocen frameworks ni proveedores"
+type = "forbidden"
+source_modules = ["transcriber.domain", "transcriber.application"]
+forbidden_modules = ["fastapi", "starlette", "uvicorn", "httpx", "faster_whisper"]
+
+[[tool.importlinter.contracts]]
+name = "Los adaptadores no se importan entre sí"
+type = "independence"
+modules = [
+    "transcriber.adapters.inbound",
+    "transcriber.adapters.outbound.analysis",
+    "transcriber.adapters.outbound.persistence",
+    "transcriber.adapters.outbound.storage",
+    "transcriber.adapters.outbound.transcription",
+]

@@ -3,12 +3,18 @@
 Transcripción local y privada de reuniones. Nada sale de tu máquina/red: Whisper y el LLM (Ollama) corren en local.
 
 ## Estructura del repositorio
+Monorepo modular: cada módulo es un proyecto independiente (su propio `pyproject.toml`, Dockerfile y tests)
+con la misma arquitectura hexagonal. Ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```
-backend/   API, worker, agente de captura, scripts y tests de Python (Dockerfile y pyproject propios)
-web/       frontal React
-docker-compose.yml, Makefile, .env   orquestación común
+modules/
+  transcriber/          Módulo 1 (este README): transcripción y resumen offline de reuniones
+    src/transcriber/      domain · application · adapters (inbound/outbound) · bootstrap
+    web/  agent/  scripts/  tests/
+  privacy-shield/       Módulo 2: proxy de ofuscación para datos que salen al exterior (pendiente)
+  realtime-assistant/   Módulo 3: resolutor de respuestas síncrono en reuniones (pendiente)
+docs/                   Arquitectura y convenciones comunes
+docker-compose.yml, Makefile, .env   Orquestación común
 ```
-Cada proyecto del portfolio vive en su propia carpeta de primer nivel con sus tests y su Dockerfile.
 
 ## Arquitectura
 ```
@@ -47,7 +53,7 @@ Desarrollo del frontal con recarga en caliente: `make web-dev` (http://localhost
 ## Captura (Windows, alternativa por línea de comandos)
 ```powershell
 pip install PyAudioWPatch numpy soundfile requests
-python backend/agent/capture_agent.py --token TU_TOKEN --title "Kickoff" --project pagos
+python modules/transcriber/agent/capture_agent.py --token TU_TOKEN --title "Kickoff" --project pagos
 # Ctrl+C para terminar → el worker transcribe, analiza y exporta
 ```
 Graba tu micro (`mic`, aparece como "Yo") y el audio del sistema (`system`, "Otros") por separado.
@@ -82,7 +88,7 @@ Para medir el efecto de cada cambio: `scripts/eval_wer.py` (ver abajo).
 
 ## Medir la fiabilidad real
 1. Graba 3-5 reuniones con audio retenido (`MT_AUDIO_RETENTION_DAYS=30`).
-2. Corrige a mano un fragmento y compara: `python backend/scripts/eval_wer.py referencia.txt hipotesis.txt` (requiere `pip install jiwer`).
+2. Corrige a mano un fragmento y compara: `python modules/transcriber/scripts/eval_wer.py referencia.txt hipotesis.txt` (requiere `pip install jiwer`).
 3. Ajusta modelo, glosario y umbrales (`MT_MIN_AVG_LOGPROB`) con datos.
 
 ## Tests
@@ -94,16 +100,16 @@ Para medir el efecto de cada cambio: `scripts/eval_wer.py` (ver abajo).
 | `make test-e2e` | Pipeline real (voz → Whisper → Ollama → Postgres, con WER) y navegador real (Playwright graba con un micro falso que reproduce la voz) | stack arrancado, Chrome |
 | `make coverage` | Informes de cobertura | |
 
-El audio de prueba (`backend/tests/fixtures/speech_es.wav`) es voz sintética en español con su guion exacto
-(`speech_es.txt`); se regenera con `powershell -File backend/tests/fixtures/make_speech.ps1`.
+El audio de prueba (`modules/transcriber/tests/fixtures/speech_es.wav`) es voz sintética en español con su guion exacto
+(`speech_es.txt`); se regenera con `powershell -File modules/transcriber/tests/fixtures/make_speech.ps1`.
 GitHub Actions ejecuta `make test` en cada push; los e2e se lanzan en local porque necesitan los modelos.
 
 ## Desarrollo
 ```bash
-make test        # crea backend/.venv con uv e instala dependencias la primera vez
+make test        # crea modules/transcriber/.venv con uv e instala dependencias la primera vez
 make web-dev     # frontal con recarga en caliente
 ```
-Variables de entorno `MT_*` en `backend/app/config.py`.
+Variables de entorno `MT_*` en `modules/transcriber/src/transcriber/config.py`.
 
 ## Pendiente / siguientes pasos
 - Migraciones con Alembic (ahora `create_all` al arrancar).
