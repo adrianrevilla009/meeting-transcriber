@@ -1,5 +1,4 @@
 import hmac
-
 from collections.abc import Iterator
 
 from fastapi import Depends, Header, HTTPException, Request, status
