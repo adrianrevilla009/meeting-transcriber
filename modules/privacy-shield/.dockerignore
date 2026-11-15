@@ -1,0 +1,6 @@
+# Solo pyproject.toml, src/ y config/ entran en la imagen; lo demás no debe viajar al contexto.
+*
+!pyproject.toml
+!src/
+!config/
+**/__pycache__

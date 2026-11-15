@@ -10,7 +10,7 @@ modules/
   transcriber/          Módulo 1 (este README): transcripción y resumen offline de reuniones
     src/transcriber/      domain · application · adapters (inbound/outbound) · bootstrap
     web/  agent/  scripts/  tests/
-  privacy-shield/       Módulo 2: proxy de ofuscación para datos que salen al exterior (pendiente)
+  privacy-shield/       Módulo 2: proxy de ofuscación para datos que salen al exterior (ver su README)
   realtime-assistant/   Módulo 3: resolutor de respuestas síncrono en reuniones (pendiente)
 docs/                   Arquitectura y convenciones comunes
 docker-compose.yml, Makefile, .env   Orquestación común

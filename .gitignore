@@ -12,3 +12,12 @@ test-results/
 playwright-report/
 coverage/
 *.egg-info/
+# privacy-shield
+modules/privacy-shield/config/glossary.yaml
+modules/privacy-shield/audit.jsonl
+modules/privacy-shield/vault.sqlite3
+modules/privacy-shield/eval/corpus/*.jsonl
+modules/privacy-shield/eval/reports/*.md
+modules/privacy-shield/eval/reports/*.json
+.mypy_cache/
+.ruff_cache/

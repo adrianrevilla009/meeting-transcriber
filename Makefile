@@ -31,7 +31,7 @@ SERVICES := db api worker web ollama
 endif
 
 .PHONY: help start open web-dev test-api test-web test-e2e test-all coverage env check models whisper-model llm-model up down restart logs ps health \
-        ollama-check agent-install record meetings transcript search test clean
+        ollama-check agent-install record meetings transcript search test clean shield-up shield-down shield-logs
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
@@ -151,3 +151,13 @@ coverage: modules/transcriber/.venv modules/transcriber/web/node_modules ## Info
 clean: ## BORRA contenedores y volumenes (BD, audio, modelos Whisper): make clean CONFIRM=yes
 	@[ "$(CONFIRM)" = "yes" ] || { echo "Esto borra todos los datos. Repite con CONFIRM=yes"; exit 1; }
 	docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml --profile setup down -v
+
+# ---------- Módulo 2: privacy-shield (ver modules/privacy-shield/README.md) ----------
+shield-up: ## Construye y arranca el proxy de ofuscación (127.0.0.1:8100)
+	@docker compose --profile shield up -d --build privacy-shield
+
+shield-down: ## Para el proxy de ofuscación
+	@docker compose --profile shield stop privacy-shield
+
+shield-logs: ## Sigue los logs del proxy de ofuscación
+	@docker compose --profile shield logs -f privacy-shield

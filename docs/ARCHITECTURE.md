@@ -6,7 +6,7 @@ comunican entre sí **por HTTP** (nunca importándose código unos a otros).
 | # | Módulo | Carpeta | Estado |
 |---|---|---|---|
 | 1 | Transcripción y resumen offline de reuniones (Whisper + Ollama) | `modules/transcriber` | Hecho |
-| 2 | Proxy de ofuscación: pseudonimiza lo que sale al exterior y revierte la respuesta | `modules/privacy-shield` | Pendiente |
+| 2 | Proxy de ofuscación: pseudonimiza lo que sale al exterior y revierte la respuesta | `modules/privacy-shield` | Hecho (fases 0-5) |
 | 3 | Resolutor de respuestas síncrono: escucha, detecta preguntas y consulta a un LLM externo (vía el módulo 2) | `modules/realtime-assistant` | Pendiente |
 
 ## Plantilla de módulo (arquitectura hexagonal)

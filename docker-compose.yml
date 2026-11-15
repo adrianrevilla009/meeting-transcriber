@@ -46,6 +46,25 @@ services:
     networks: [backend]
     restart: unless-stopped
 
+  # Módulo 2 (privacy-shield): proxy de ofuscación hacia LLMs externos. Perfil opcional:
+  #   docker compose --profile shield up -d --build privacy-shield   (o: make shield-up)
+  # Es el ÚNICO servicio con salida a Internet (red 'edge'); solo se publica en 127.0.0.1.
+  privacy-shield:
+    build: ./modules/privacy-shield
+    profiles: [shield]
+    environment:
+      ANON_API_TOKEN: ${ANON_API_TOKEN:-change-me}
+      ANON_DEFAULT_PROVIDER: ${ANON_DEFAULT_PROVIDER:-anthropic}
+      ANON_OPENAI_API_KEY: ${ANON_OPENAI_API_KEY:-}
+      ANON_ANTHROPIC_API_KEY: ${ANON_ANTHROPIC_API_KEY:-}
+      ANON_OLLAMA_URL: ${ANON_OLLAMA_URL:-http://host.docker.internal:11434}
+      ANON_VAULT: ${ANON_VAULT:-memory}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes: [shielddata:/data]
+    ports: ["127.0.0.1:8100:8100"]
+    networks: [edge]
+    restart: unless-stopped
+
   # --- Descarga de modelos (solo con red). Ejecutar una vez: docker compose --profile setup run --rm models
   models:
     <<: *app
@@ -63,4 +82,4 @@ networks:
   backend: { internal: true }
   edge: {}
 
-volumes: { pgdata: {}, appdata: {}, ollama: {} }
+volumes: { pgdata: {}, appdata: {}, ollama: {}, shielddata: {} }

@@ -1,0 +1,8 @@
+# Términos propios a proteger: clientes, proyectos, apodos. Copia a config/glossary.yaml (ignorado por git).
+# Se detectan sin distinguir mayúsculas ni tildes.
+terms:
+  - text: "Proyecto Quimera"
+    type: GLOSARIO
+    aliases: ["Quimera"]
+  - text: "Zoltrabek"
+  - "Cliente Atlas"

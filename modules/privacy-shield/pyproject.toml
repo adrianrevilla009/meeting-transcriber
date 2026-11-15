@@ -1,0 +1,119 @@
+[project]
+name = "privacy-shield"
+version = "0.1.0"
+description = "Proxy de ofuscación: pseudonimiza datos personales antes de enviarlos a un LLM externo y revierte la respuesta"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    "httpx>=0.27",
+    "pyyaml>=6.0",  # policy.yaml y glossary.yaml (ver DECISIONS.md)
+]
+
+[project.optional-dependencies]
+# NER en español. El modelo se instala aparte: python -m spacy download es_core_news_md
+ner = ["spacy>=3.8,<3.9"]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5",
+    "hypothesis>=6.100",
+    "faker>=30",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.0",
+    "bandit>=1.8",
+    "pip-audit>=2.7",
+    "types-PyYAML",
+]
+
+[project.scripts]
+privacy-shield = "privacy_shield.bootstrap.cli:main"
+
+# Layout src/: solo privacy_shield es instalable (eval/, config/ y tests/ no se empaquetan).
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["privacy_shield*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "ner: necesita spaCy y el modelo es_core_news_md (se salta si no están instalados)",
+    "live: llama a proveedores reales (necesita claves); excluidos por defecto",
+]
+addopts = "-m 'not live'"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests", "eval"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC"]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # el código está en español: tildes y comillas tipográficas son intencionadas
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "E501"]  # assert, tokens de prueba y datos literales largos
+"eval/**" = ["S101", "S311", "E501"]  # el generador usa random con semilla (no es criptografía)
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["privacy_shield"]
+ignore_missing_imports = true
+check_untyped_defs = true
+
+# Estricto en el núcleo (domain y application), como pide la arquitectura.
+[[tool.mypy.overrides]]
+module = ["privacy_shield.domain.*", "privacy_shield.application.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_equality = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+
+# Arquitectura hexagonal (ver docs/ARCHITECTURE.md). Se comprueba con `lint-imports`.
+[tool.importlinter]
+root_package = "privacy_shield"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Capas: bootstrap > adapters > application > domain"
+type = "layers"
+layers = [
+    "privacy_shield.bootstrap",
+    "privacy_shield.adapters",
+    "privacy_shield.application",
+    "privacy_shield.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Dominio y aplicación no conocen frameworks ni proveedores"
+type = "forbidden"
+source_modules = ["privacy_shield.domain", "privacy_shield.application"]
+forbidden_modules = ["fastapi", "starlette", "uvicorn", "httpx", "spacy", "yaml", "pydantic", "pydantic_settings"]
+
+[[tool.importlinter.contracts]]
+name = "Los adaptadores no se importan entre sí"
+type = "independence"
+modules = [
+    "privacy_shield.adapters.inbound",
+    "privacy_shield.adapters.outbound.audit",
+    "privacy_shield.adapters.outbound.detectors",
+    "privacy_shield.adapters.outbound.files",
+    "privacy_shield.adapters.outbound.llm",
+    "privacy_shield.adapters.outbound.vault",
+]

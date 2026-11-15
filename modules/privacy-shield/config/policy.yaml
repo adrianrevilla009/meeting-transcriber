@@ -1,0 +1,25 @@
+# Qué hacer con cada tipo de entidad detectada.
+#   pseudonymize  token reversible dentro de la sesión: [PERSONA_1]
+#   mask          token no reversible: [IBAN]
+#   block         rechaza TODA la petición (error 422)
+#   allow         no se toca
+default_min_score: 0.5   # confianza mínima por defecto (0-1)
+local_only: false        # true = solo proveedores que no salen de la máquina (p. ej. ollama)
+
+strategies:
+  PERSONA: pseudonymize
+  ORGANIZACION: pseudonymize
+  UBICACION: pseudonymize
+  GLOSARIO: pseudonymize
+  EMAIL: pseudonymize
+  TELEFONO: pseudonymize
+  URL: pseudonymize
+  IP: pseudonymize
+  DNI_NIE: mask
+  IBAN: mask
+  TARJETA: block
+  SECRETO: block
+
+# Umbral por tipo (si no aparece, se usa default_min_score)
+min_scores:
+  UBICACION: 0.6
