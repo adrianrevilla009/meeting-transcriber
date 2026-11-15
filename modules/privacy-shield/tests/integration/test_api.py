@@ -24,8 +24,8 @@ TEXT = "Hola, soy Marta García y mi correo es marta@example.org"
 EXPECTED_OUT = "Hola, soy [PERSONA_1] y mi correo es [EMAIL_1]"
 
 
-def client_for(rt: Runtime, *, token: str = "tok", debug: bool = False) -> TestClient:
-    return TestClient(create_app(rt, api_token=token, debug_mapping=debug))
+def client_for(rt: Runtime, *, bearer: str = "tok", debug: bool = False) -> TestClient:
+    return TestClient(create_app(rt, api_token=bearer, debug_mapping=debug))
 
 
 def chat_body(text: str = TEXT, **extra: object) -> dict[str, object]:
@@ -60,7 +60,7 @@ def test_endpoints_require_the_token(method: str, path: str) -> None:
 @pytest.mark.parametrize("token", ["", "change-me"])
 def test_unconfigured_token_fails_closed(token: str) -> None:
     rt, _, _ = make_runtime()
-    assert client_for(rt, token=token).get("/v1/providers", headers={"Authorization": f"Bearer {token}"}).status_code == 503
+    assert client_for(rt, bearer=token).get("/v1/providers", headers={"Authorization": f"Bearer {token}"}).status_code == 503
 
 
 # ------------------------------------------------------------------ anonymize / deanonymize

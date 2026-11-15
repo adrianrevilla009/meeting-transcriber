@@ -1,5 +1,7 @@
 """Núcleo: pseudonimizador, desanonimizador (también en streaming), leak guard, normalizador de ASR y política."""
 
+import itertools
+
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -128,7 +130,7 @@ STREAM_TEXT = (
 def _stream(vault: VaultPort, session: SessionId, cuts: list[int]) -> tuple[str, int]:
     streaming = StreamingDeanonymizer(Deanonymizer(vault), session)
     points = sorted({0, len(STREAM_TEXT), *(c for c in cuts if 0 <= c <= len(STREAM_TEXT))})
-    out = "".join(streaming.feed(STREAM_TEXT[a:b]) for a, b in zip(points, points[1:], strict=False))
+    out = "".join(streaming.feed(STREAM_TEXT[a:b]) for a, b in itertools.pairwise(points))
     return out + streaming.flush(), streaming.unknown_tokens
 
 

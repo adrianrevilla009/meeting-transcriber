@@ -51,7 +51,7 @@ class SqliteVault:
     def _drop(self, session: str) -> None:
         for table in _TABLES:
             # Los nombres de tabla son constantes del módulo, no entrada de usuario.
-            self._db.execute(f"DELETE FROM {table} WHERE session = ?", (session,))  # noqa: S608  # nosec B608
+            self._db.execute(f"DELETE FROM {table} WHERE session = ?", (session,))  # noqa: S608
         self._db.execute("DELETE FROM sessions WHERE id = ?", (session,))
 
     def _type_of(self, session: SessionId, token: str) -> EntityType | None:

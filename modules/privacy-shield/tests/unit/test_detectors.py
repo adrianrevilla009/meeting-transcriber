@@ -5,8 +5,9 @@ import pytest
 from privacy_shield.adapters.outbound.detectors.composite import resolve_overlaps
 from privacy_shield.adapters.outbound.detectors.glossary import GlossaryDetector
 from privacy_shield.adapters.outbound.detectors.names import NameListDetector
+from privacy_shield.adapters.outbound.detectors.org_patterns import OrgPatternDetector
 from privacy_shield.adapters.outbound.detectors.regex_es import RegexDetector
-from privacy_shield.adapters.outbound.detectors.spacy_ner import SpacyNerDetector
+from privacy_shield.adapters.outbound.detectors.spacy_ner import SpacyNerDetector, recase
 from privacy_shield.domain.entities import DetectedEntity, EntityType
 from privacy_shield.domain.glossary import GlossaryTerm
 
@@ -107,6 +108,30 @@ def test_lowercase_asr_name_needs_a_cue() -> None:
     names = NameListDetector()
     assert [e.text for e in names.detect("dile a todos que hable con marta mañana")] == ["marta"]
     assert names.detect("la marta es un animal") == []
+
+
+def test_names_extends_to_an_unknown_surname() -> None:
+    names = NameListDetector()
+    assert [e.text for e in names.detect("Hey, send the report to Emilio Zabaleta tomorrow")] == ["Emilio Zabaleta"]
+    assert [e.text for e in names.detect("Dile a Marta Gracias por todo")] == ["Marta"]  # 'Gracias' no es un apellido
+    assert [e.text for e in names.detect("Habló ARTEMIO SEGOVIA ayer")] == ["ARTEMIO SEGOVIA"]
+
+
+def test_names_do_not_swallow_the_next_sentence() -> None:
+    assert [e.text for e in NameListDetector().detect("Hablé con Marta. Luego fui a casa")] == ["Marta"]
+
+
+def test_org_patterns() -> None:
+    orgs = OrgPatternDetector()
+    text = "Trabaja en Industrias Navarro y colabora con la Fundación de la Esperanza; factura Gómez y Hermanos S.L. hoy."
+    assert [e.text for e in orgs.detect(text)] == ["Industrias Navarro", "Fundación de la Esperanza", "Gómez y Hermanos S.L."]
+    assert all(e.type == EntityType.ORGANIZACION for e in orgs.detect(text))
+    assert orgs.detect("Buscamos soluciones técnicas y un grupo de trabajo") == []
+
+
+def test_ner_recases_shouted_text_only() -> None:
+    assert recase("LE DIJE A ARTEMIO SEGOVIA QUE VINIERA") == "LE Dije A Artemio Segovia Que Viniera"
+    assert recase("Hablé con la ONU ayer por la tarde") == "Hablé con la ONU ayer por la tarde"
 
 
 def _entity(entity_type: EntityType, start: int, end: int, score: float, source: str) -> DetectedEntity:

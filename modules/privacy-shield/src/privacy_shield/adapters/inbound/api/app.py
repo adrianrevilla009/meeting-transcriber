@@ -130,7 +130,7 @@ def mapping(session_id: str, request: Request, rt: Runtime = Depends(get_runtime
     session = SessionId(session_id)
     if not rt.vault.session_exists(session):
         return JSONResponse({"error": "session_not_found"}, 404)
-    tokens = {}
+    tokens: dict[str, str] = {}
     for entity_type, value in rt.vault.known_values(session):
         token = rt.vault.find_token(session, entity_type, value)
         if token:

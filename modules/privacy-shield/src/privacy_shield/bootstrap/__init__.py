@@ -10,6 +10,7 @@ from privacy_shield.adapters.outbound.clock import SystemClock
 from privacy_shield.adapters.outbound.detectors.composite import CompositeDetector
 from privacy_shield.adapters.outbound.detectors.glossary import GlossaryDetector
 from privacy_shield.adapters.outbound.detectors.names import NameListDetector
+from privacy_shield.adapters.outbound.detectors.org_patterns import OrgPatternDetector
 from privacy_shield.adapters.outbound.detectors.regex_es import RegexDetector
 from privacy_shield.adapters.outbound.detectors.spacy_ner import SpacyNerDetector
 from privacy_shield.adapters.outbound.files.loaders import load_glossary, load_policy
@@ -43,6 +44,7 @@ def build_detector(settings: Settings, glossary: Sequence[GlossaryTerm] | None =
     detectors: list[DetectorPort] = [RegexDetector(), GlossaryDetector(terms)]
     if settings.names_enabled:
         detectors.append(NameListDetector())
+        detectors.append(OrgPatternDetector())
     if settings.ner_enabled:
         detectors.append(SpacyNerDetector(settings.spacy_model))  # se carga una sola vez, al arrancar
     return NormalizingDetector(CompositeDetector(detectors))

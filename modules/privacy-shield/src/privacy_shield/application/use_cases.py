@@ -236,7 +236,7 @@ class ProtectedChat:
         detect_ms = self._clock.perf_ms() - t0
         # Segunda barrera sobre TODO lo que sale (contenidos, nombres, modelo y metadatos).
         payload = [m.content for m in messages] + [m.name or "" for m in messages]
-        payload += [request.model or ""] + list(metadata.keys()) + list(metadata.values())
+        payload += [request.model or "", *metadata.keys(), *metadata.values()]
         self._guard.check(session, payload)
         return outgoing, tuple(replacements), detect_ms
 

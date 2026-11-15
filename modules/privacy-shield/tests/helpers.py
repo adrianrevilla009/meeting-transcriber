@@ -6,6 +6,7 @@ from privacy_shield.adapters.outbound.audit.memory import MemoryAuditAdapter
 from privacy_shield.adapters.outbound.detectors.composite import CompositeDetector
 from privacy_shield.adapters.outbound.detectors.glossary import GlossaryDetector
 from privacy_shield.adapters.outbound.detectors.names import NameListDetector
+from privacy_shield.adapters.outbound.detectors.org_patterns import OrgPatternDetector
 from privacy_shield.adapters.outbound.detectors.regex_es import RegexDetector
 from privacy_shield.adapters.outbound.llm.fake_adapter import FakeLLMAdapter
 from privacy_shield.adapters.outbound.llm.registry import ProviderRegistry
@@ -44,7 +45,7 @@ class FakeClock:
 
 def make_detector() -> DetectorPort:
     """Regex + glosario + lista de nombres (sin spaCy), con normalizador de ASR."""
-    return NormalizingDetector(CompositeDetector([RegexDetector(), GlossaryDetector(GLOSSARY), NameListDetector()]))
+    return NormalizingDetector(CompositeDetector([RegexDetector(), GlossaryDetector(GLOSSARY), NameListDetector(), OrgPatternDetector()]))
 
 
 def make_runtime(

@@ -6,7 +6,7 @@ from privacy_shield.application.ports import DetectorPort
 from privacy_shield.domain.entities import DetectedEntity
 
 # regex > glosario > lista de nombres > NER
-_PRIORITY = {"regex": 0, "glossary": 1, "names": 2, "ner": 3}
+_PRIORITY = {"regex": 0, "glossary": 1, "names": 2, "orgs": 2, "ner": 3}
 
 
 class CompositeDetector:
