@@ -98,7 +98,7 @@ jobs:
           cache-dependency-path: modules/privacy-shield/pyproject.toml
       - run: pip install -e ".[dev]"
       - run: |
-          for c in "ruff check ." "mypy" "lint-imports" "bandit -q -r src -c pyproject.toml"; do $c || echo "$c" >> failed.txt; done 2>&1 | tee out.txt
+          for c in "ruff check --output-format=concise ." "mypy" "lint-imports" "bandit -q -r src -c pyproject.toml"; do $c || echo "$c" >> failed.txt; done 2>&1 | tee out.txt
           test ! -f failed.txt
       - name: Anotar fallos
         if: failure()

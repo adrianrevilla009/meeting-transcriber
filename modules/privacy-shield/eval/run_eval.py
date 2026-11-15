@@ -131,11 +131,11 @@ def evaluate(samples: list[Sample], *, ner: bool = True) -> dict[str, Any]:
                 bump(per_scenario, sample.scenario, "leaked")
                 failures.append({"scenario": sample.scenario, "kind": sample.kind, "type": label.type, "value": label.value, "reason": "fuga"})
 
-        if status == "ok" and anonymized is not None and session is not None and replacements:
-            if all(r.strategy == Strategy.PSEUDONYMIZE for r in replacements):
-                round_trip["eligible"] += 1
-                if rt.deanonymize.execute(session, anonymized) == sample.text:
-                    round_trip["ok"] += 1
+        reversible = replacements and all(r.strategy == Strategy.PSEUDONYMIZE for r in replacements)
+        if status == "ok" and anonymized is not None and session is not None and reversible:
+            round_trip["eligible"] += 1
+            if rt.deanonymize.execute(session, anonymized) == sample.text:
+                round_trip["ok"] += 1
 
     labeled = totals["labeled"] or 1
     return {

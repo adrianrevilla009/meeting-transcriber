@@ -31,6 +31,11 @@ _DICTATED_SECRET = re.compile(
 _DNI_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE"
 _NIE_PREFIX = {"X": "0", "Y": "1", "Z": "2"}
 _URL_TRAILING = ".,;:!?)"
+# Longitud exacta de los IBAN más comunes: evita que un IBAN seguido de una palabra pase mod 97 por azar.
+_IBAN_LENGTHS = {
+    "ES": 24, "FR": 27, "DE": 22, "IT": 27, "PT": 25, "GB": 22,
+    "NL": 18, "BE": 16, "AT": 20, "CH": 21, "IE": 22, "LU": 20,
+}  # fmt: skip
 
 
 class RegexDetector:
@@ -121,6 +126,8 @@ class RegexDetector:
 def _iban_valid(compact: str) -> bool:
     compact = compact.upper()
     if not 15 <= len(compact) <= 34 or not compact[:2].isalpha() or not compact[2:4].isdigit():
+        return False
+    if len(compact) != _IBAN_LENGTHS.get(compact[:2], len(compact)):
         return False
     rearranged = compact[4:] + compact[:4]
     try:

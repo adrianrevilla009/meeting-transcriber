@@ -63,6 +63,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "E501"]  # assert, tokens de prueba y datos literales largos
 "eval/**" = ["S101", "S311", "E501"]  # el generador usa random con semilla (no es criptografía)
+"src/privacy_shield/adapters/outbound/detectors/names.py" = ["SIM905"]  # listas de palabras en bloque, más legibles
 
 [tool.mypy]
 python_version = "3.12"
