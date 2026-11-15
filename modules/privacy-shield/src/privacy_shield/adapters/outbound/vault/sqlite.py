@@ -21,7 +21,11 @@ CREATE TABLE IF NOT EXISTS keys (
     PRIMARY KEY (session, type, norm));
 CREATE TABLE IF NOT EXISTS aliases (session TEXT NOT NULL, token TEXT NOT NULL, alias TEXT NOT NULL);
 """
-_TABLES = ("tokens", "keys", "aliases")
+_DELETE_SESSION = (
+    "DELETE FROM tokens WHERE session = ?",
+    "DELETE FROM keys WHERE session = ?",
+    "DELETE FROM aliases WHERE session = ?",
+)
 
 
 class SqliteVault:
@@ -49,9 +53,8 @@ class SqliteVault:
         return exists or create
 
     def _drop(self, session: str) -> None:
-        for table in _TABLES:
-            # Los nombres de tabla son constantes del módulo, no entrada de usuario.
-            self._db.execute(f"DELETE FROM {table} WHERE session = ?", (session,))  # noqa: S608
+        for statement in _DELETE_SESSION:
+            self._db.execute(statement, (session,))
         self._db.execute("DELETE FROM sessions WHERE id = ?", (session,))
 
     def _type_of(self, session: SessionId, token: str) -> EntityType | None:

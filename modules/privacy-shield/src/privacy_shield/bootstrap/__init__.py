@@ -27,8 +27,8 @@ from privacy_shield.application.ports import AuditPort, ClockPort, DetectorPort,
 from privacy_shield.application.pseudonymizer import Pseudonymizer
 from privacy_shield.application.runtime import Runtime
 from privacy_shield.application.use_cases import (
-    AnonymizeText,
     Anonymizer,
+    AnonymizeText,
     ChatSettings,
     DeanonymizeText,
     ProtectedChat,
