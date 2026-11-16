@@ -25,7 +25,7 @@ def types(rt: Runtime, meeting_id: int = 1) -> list[str]:
 
 
 async def test_detects_a_question_and_answers_it() -> None:
-    rt, source, generator, _ = make_runtime(classifier=FakeClassifier())
+    rt, source, _, _ = make_runtime(classifier=FakeClassifier())
     source.add(seg(1, "Buenos días a todos."), seg(2, QUESTION))
     assert await rt.assistant.step(1) == 2
     await rt.assistant.wait_idle(1)
@@ -55,14 +55,14 @@ async def test_classifier_can_reject_a_candidate() -> None:
 
 
 async def test_questions_not_directed_at_the_user_are_ignored() -> None:
-    rt, source, generator, _ = make_runtime(classifier=FakeClassifier(Verdict(True, directed_at_me=False)))
+    rt, source, _, _ = make_runtime(classifier=FakeClassifier(Verdict(True, directed_at_me=False)))
     source.add(seg(1, QUESTION))
     await rt.assistant.step(1)
     assert types(rt) == []
 
 
 async def test_falls_back_to_the_rules_when_the_local_llm_is_down() -> None:
-    rt, source, generator, _ = make_runtime(classifier=FakeClassifier(error=ClassifierUnavailable("caído")))
+    rt, source, _, _ = make_runtime(classifier=FakeClassifier(error=ClassifierUnavailable("caído")))
     source.add(seg(1, QUESTION))
     await rt.assistant.step(1)
     await rt.assistant.wait_idle(1)
@@ -153,7 +153,7 @@ async def test_manual_questions_are_always_answered() -> None:
 
 
 async def test_answers_are_generated_one_at_a_time_per_meeting() -> None:
-    rt, _, generator, _ = make_runtime()
+    rt, _, _, _ = make_runtime()
     await rt.assistant.ask(1, "primera pregunta")
     await rt.assistant.ask(1, "segunda pregunta")
     await rt.assistant.wait_idle(1)
@@ -171,7 +171,7 @@ async def test_answers_are_generated_one_at_a_time_per_meeting() -> None:
     ],
 )
 async def test_answer_failures_become_error_events_and_can_be_retried(error: Exception, code: str) -> None:
-    rt, _, generator, _ = make_runtime(generator=FakeGenerator(error=error))
+    rt, _, _, _ = make_runtime(generator=FakeGenerator(error=error))
     qid = await rt.assistant.ask(1, "¿Qué opinas del plan?")
     await rt.assistant.wait_idle(1)
     assert types(rt) == ["question", "answer_start", "error"]
