@@ -59,6 +59,9 @@ services:
       ANON_ANTHROPIC_API_KEY: ${ANON_ANTHROPIC_API_KEY:-}
       ANON_OLLAMA_URL: ${ANON_OLLAMA_URL:-http://host.docker.internal:11434}
       ANON_VAULT: ${ANON_VAULT:-memory}
+      ANON_SKIP_LOCAL: ${ANON_SKIP_LOCAL:-true}
+      ANON_OLLAMA_MODEL: ${ANON_OLLAMA_MODEL:-qwen2.5:7b}
+      ANON_DEBUG_MAPPING: ${ANON_DEBUG_MAPPING:-false}
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes: [shielddata:/data]
     ports: ["127.0.0.1:8100:8100"]
