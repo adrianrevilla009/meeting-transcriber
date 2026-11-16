@@ -8,6 +8,8 @@ import { api, ApiError } from "../api";
 
 export type Source = "mic" | "system";
 export const CHUNK_SECONDS = 45;
+/** Trozos cortos para el asistente en vivo: la respuesta llega antes, a costa de algo de precisión. */
+export const LIVE_CHUNK_SECONDS = 12;
 const TARGET_SR = 16_000;
 
 export interface AudioChunk {
@@ -170,8 +172,9 @@ export class SourceCapture {
     stream: MediaStream,
     readonly source: Source,
     onChunk: (c: AudioChunk) => void,
+    chunkSeconds = CHUNK_SECONDS,
   ) {
-    this.acc = new ChunkAccumulator(source, ctx.sampleRate, onChunk);
+    this.acc = new ChunkAccumulator(source, ctx.sampleRate, onChunk, chunkSeconds);
     this.src = ctx.createMediaStreamSource(stream);
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 2048;

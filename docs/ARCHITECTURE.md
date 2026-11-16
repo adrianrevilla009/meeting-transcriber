@@ -7,7 +7,7 @@ comunican entre sí **por HTTP** (nunca importándose código unos a otros).
 |---|---|---|---|
 | 1 | Transcripción y resumen offline de reuniones (Whisper + Ollama) | `modules/transcriber` | Hecho |
 | 2 | Proxy de ofuscación: pseudonimiza lo que sale al exterior y revierte la respuesta | `modules/privacy-shield` | Hecho (fases 0-5) |
-| 3 | Resolutor de respuestas síncrono: escucha, detecta preguntas y consulta a un LLM externo (vía el módulo 2) | `modules/realtime-assistant` | Pendiente |
+| 3 | Asistente en vivo: sigue la reunión, detecta preguntas y sugiere respuestas con un LLM externo (siempre vía el módulo 2) | `modules/realtime-assistant` | Hecho |
 
 ## Plantilla de módulo (arquitectura hexagonal)
 
@@ -73,3 +73,17 @@ que reciben `session` y `rt`, sin estado global.
   aparezca la tercera necesidad; entonces se extrae a `libs/<nombre>` con su propio paquete.
 - **Redes Docker**: solo `privacy-shield` tendrá salida a Internet; el resto, en redes internas, y hablarán con
   él por HTTP cuando necesiten un LLM en la nube.
+
+## Cómo se conectan los módulos (Docker)
+
+```
+navegador ──▶ web (nginx) ──/api/──────▶ api (módulo 1) ──▶ db, worker, ollama
+                   │
+                   └──/assistant/──▶ assistant (módulo 3) ──▶ api (lee /meetings/{id}/segments)
+                                          │                └──▶ ollama (clasifica preguntas, local)
+                                          └──▶ privacy-shield (módulo 2) ──▶ LLM en la nube
+```
+
+Redes: `backend` y `assist` son internas (sin Internet); solo `privacy-shield` está también en `edge`. El asistente
+vive en `backend` + `assist`, así que **no puede salir a Internet** aunque se cambiara una URL: lo único externo
+pasa por el filtro de privacidad. Los módulos se hablan solo por HTTP y comparten el token de la web.

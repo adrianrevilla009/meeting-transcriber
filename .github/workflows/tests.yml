@@ -143,6 +143,54 @@ jobs:
           name: informe-evaluacion
           path: modules/privacy-shield/eval/reports/
 
+  assistant-quality:
+    name: Assistant (lint, tipos, arquitectura, seguridad)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/realtime-assistant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: modules/realtime-assistant/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: |
+          for c in "ruff check --output-format=concise ." "mypy" "lint-imports" "bandit -q -r src -c pyproject.toml"; do $c || echo "$c" >> failed.txt; done 2>&1 | tee out.txt
+          test ! -f failed.txt
+      - name: Anotar fallos
+        if: failure()
+        run: |
+          body=$( { cat failed.txt; grep -vE '^(Found|All checks|Success|No issues)' out.txt | head -60; } | cut -c1-250 | head -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Fallos de calidad::$body"
+      - run: pip-audit
+        continue-on-error: true # depende de avisos externos; no debe bloquear
+
+  assistant-tests:
+    name: Assistant (tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/realtime-assistant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: modules/realtime-assistant/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: |
+          set -o pipefail
+          pytest --cov=realtime_assistant --cov-report=term-missing 2>&1 | tee out.txt
+      - name: Anotar fallos
+        if: failure()
+        run: |
+          body=$( { grep -E '^(FAILED|ERROR|E  )' out.txt | head -40; tail -5 out.txt; } | cut -c1-250 | head -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Fallos de pytest::$body"
+
   docker:
     name: Docker (hadolint + build)
     runs-on: ubuntu-latest
@@ -159,6 +207,10 @@ jobs:
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: modules/privacy-shield/Dockerfile
+          config: .hadolint.yaml
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: modules/realtime-assistant/Dockerfile
           config: .hadolint.yaml
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
@@ -179,6 +231,12 @@ jobs:
           push: false
           cache-from: type=gha,scope=shield
           cache-to: type=gha,mode=max,scope=shield
+      - uses: docker/build-push-action@v6
+        with:
+          context: modules/realtime-assistant
+          push: false
+          cache-from: type=gha,scope=assistant
+          cache-to: type=gha,mode=max,scope=assistant
 
 # Los e2e (pytest -m e2e y Playwright) necesitan Whisper y Ollama con modelos de varios GB:
 # se ejecutan en local con `make test-e2e`.

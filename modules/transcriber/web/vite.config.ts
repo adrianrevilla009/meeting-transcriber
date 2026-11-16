@@ -11,6 +11,11 @@ export default defineConfig({
         target: "http://127.0.0.1:8000",
         rewrite: (p) => p.replace(/^\/api/, ""),
       },
+      // Asistente en vivo (módulo 3), también bajo el mismo origen.
+      "/assistant": {
+        target: "http://127.0.0.1:8200",
+        rewrite: (p) => p.replace(/^\/assistant/, ""),
+      },
     },
   },
   test: {

@@ -1,0 +1,103 @@
+[project]
+name = "realtime-assistant"
+version = "0.1.0"
+description = "Asistente en vivo: sigue una reunión, detecta preguntas y sugiere respuestas a través de privacy-shield"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.0",
+    "bandit>=1.8",
+    "pip-audit>=2.7",
+]
+
+# Layout src/: solo realtime_assistant es instalable (tests/ no se empaqueta).
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["realtime_assistant*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = [".", "src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC"]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # el código está en español: tildes y comillas tipográficas son intencionadas
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "E501"]  # assert, tokens de prueba y datos literales largos
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["realtime_assistant"]
+ignore_missing_imports = true
+check_untyped_defs = true
+
+# Estricto en el núcleo (domain y application), como pide la arquitectura.
+[[tool.mypy.overrides]]
+module = ["realtime_assistant.domain.*", "realtime_assistant.application.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_equality = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+
+# Arquitectura hexagonal (ver docs/ARCHITECTURE.md). Se comprueba con `lint-imports`.
+[tool.importlinter]
+root_package = "realtime_assistant"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Capas: bootstrap > adapters > application > domain"
+type = "layers"
+layers = [
+    "realtime_assistant.bootstrap",
+    "realtime_assistant.adapters",
+    "realtime_assistant.application",
+    "realtime_assistant.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Dominio y aplicación no conocen frameworks ni proveedores"
+type = "forbidden"
+source_modules = ["realtime_assistant.domain", "realtime_assistant.application"]
+forbidden_modules = ["fastapi", "starlette", "uvicorn", "httpx", "pydantic", "pydantic_settings"]
+
+[[tool.importlinter.contracts]]
+name = "Los adaptadores no se importan entre sí"
+type = "independence"
+modules = [
+    "realtime_assistant.adapters.inbound",
+    "realtime_assistant.adapters.outbound.answers",
+    "realtime_assistant.adapters.outbound.classifier",
+    "realtime_assistant.adapters.outbound.events",
+    "realtime_assistant.adapters.outbound.source",
+]

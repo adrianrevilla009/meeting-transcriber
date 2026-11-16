@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
+  Bot,
   Brain,
   CalendarClock,
   Check,
@@ -20,6 +21,7 @@ import { api } from "../api";
 import { downloadText, fmtDate, fmtDuration, fmtTs, meetingTitle, phaseOf, slug, SPEAKER, type Phase } from "../format";
 import type { Meeting as MeetingT, Progress, Segment } from "../types";
 import { ConfirmButton, Empty, highlight, ProgressBar, ProjectTag, Spinner, StatusPill } from "../components/ui";
+import { AssistantPanel } from "../components/AssistantPanel";
 import { useToast } from "../components/Toasts";
 import { useRecorder } from "../recorder/RecorderContext";
 
@@ -232,7 +234,7 @@ export function Meeting() {
   const toast = useToast();
   const rec = useRecorder();
   const focus = params.get("seg") ? Number(params.get("seg")) : null;
-  const [tab, setTab] = useState<"summary" | "transcript">(focus != null ? "transcript" : "summary");
+  const [tab, setTab] = useState<"summary" | "transcript" | "assistant">(focus != null ? "transcript" : "summary");
   const [copied, setCopied] = useState(false);
 
   const meetingQ = useQuery({
@@ -395,14 +397,15 @@ export function Meeting() {
           <FileText size={16} /> Transcripción
           {segmentsQ.data && segmentsQ.data.length > 0 && <span className="tab-count">{segmentsQ.data.length}</span>}
         </button>
+        <button className={`tab ${tab === "assistant" ? "active" : ""}`} onClick={() => setTab("assistant")}>
+          <Bot size={16} /> Asistente
+        </button>
       </div>
 
       <div className="glass tab-panel">
-        {tab === "summary" ? (
-          <Summary meeting={m} phase={phase} />
-        ) : (
-          <Transcript segments={segmentsQ.data ?? []} phase={phase} focus={focus} />
-        )}
+        {tab === "summary" && <Summary meeting={m} phase={phase} />}
+        {tab === "transcript" && <Transcript segments={segmentsQ.data ?? []} phase={phase} focus={focus} />}
+        {tab === "assistant" && <AssistantPanel meetingId={m.id} />}
       </div>
     </div>
   );

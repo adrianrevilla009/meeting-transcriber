@@ -1,7 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
+import { assistant } from "../assistantApi";
 import type { Meeting } from "../types";
-import { SourceCapture, Uploader, workletModuleUrl, type UploadStats } from "./engine";
+import {
+  CHUNK_SECONDS,
+  LIVE_CHUNK_SECONDS,
+  SourceCapture,
+  Uploader,
+  workletModuleUrl,
+  type UploadStats,
+} from "./engine";
 
 export type RecorderPhase = "idle" | "starting" | "recording" | "stopping";
 
@@ -10,12 +18,16 @@ export interface StartOptions {
   project: string;
   mic: boolean;
   system: boolean;
+  /** Asistente en vivo: trozos cortos y seguimiento de la reunión por el módulo 3. */
+  assistant?: boolean;
 }
 
 interface RecorderState {
   phase: RecorderPhase;
   meeting: Meeting | null;
   startedAt: number | null;
+  chunkSeconds: number;
+  assistant: boolean;
   analysers: { mic?: AnalyserNode; system?: AnalyserNode };
   stats: UploadStats;
   warnings: string[];
@@ -33,6 +45,8 @@ const INITIAL: RecorderState = {
   phase: "idle",
   meeting: null,
   startedAt: null,
+  chunkSeconds: CHUNK_SECONDS,
+  assistant: false,
   analysers: {},
   stats: EMPTY_STATS,
   warnings: [],
@@ -107,17 +121,27 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       await ctx.audioWorklet.addModule(workletModuleUrl());
       await ctx.resume();
 
+      const chunkSeconds = o.assistant ? LIVE_CHUNK_SECONDS : CHUNK_SECONDS;
       const uploader = new Uploader(meeting.id, (stats) => patch({ stats: { ...stats } }));
       rt.current.uploader = uploader;
       const analysers: RecorderState["analysers"] = {};
       for (const source of ["mic", "system"] as const) {
         const stream = streams[source];
         if (!stream) continue;
-        const cap = new SourceCapture(ctx, stream, source, (c) => uploader.add(c));
+        const cap = new SourceCapture(ctx, stream, source, (c) => uploader.add(c), chunkSeconds);
         rt.current.captures.push(cap);
         analysers[source] = cap.analyser;
       }
-      patch({ phase: "recording", meeting, startedAt: Date.now(), analysers });
+      let following = false;
+      if (o.assistant) {
+        try {
+          await assistant.follow(meeting.id);
+          following = true;
+        } catch {
+          warn("No se pudo activar el asistente en vivo. Puedes activarlo desde la reunión.");
+        }
+      }
+      patch({ phase: "recording", meeting, startedAt: Date.now(), analysers, chunkSeconds, assistant: following });
     } catch (e) {
       teardown();
       if (meeting) void api.deleteMeeting(meeting.id).catch(() => undefined);

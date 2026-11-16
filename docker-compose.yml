@@ -36,7 +36,7 @@ services:
   web:
     build: ./modules/transcriber/web
     ports: ["127.0.0.1:3000:8080"]
-    networks: [edge]
+    networks: [edge, assist]
     depends_on: [api]
     restart: unless-stopped
 
@@ -65,7 +65,29 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes: [shielddata:/data]
     ports: ["127.0.0.1:8100:8100"]
-    networks: [edge]
+    networks: [edge, assist]  # assist: solo el asistente y la web hablan con él
+    restart: unless-stopped
+
+  # Módulo 3 (realtime-assistant): sigue la reunión, detecta preguntas y sugiere respuestas.
+  # SIN salida a Internet (redes internas): solo habla con el transcriber, privacy-shield y Ollama.
+  #   docker compose --profile shield up -d --build privacy-shield assistant   (o: make assistant-up)
+  assistant:
+    build: ./modules/realtime-assistant
+    profiles: [shield]
+    environment:
+      RTA_API_TOKEN: ${MT_API_TOKEN}  # el mismo token de la UI
+      RTA_TRANSCRIBER_URL: http://api:8000
+      RTA_SHIELD_URL: http://privacy-shield:8100
+      RTA_SHIELD_TOKEN: ${ANON_API_TOKEN:-change-me}
+      RTA_SHIELD_PROVIDER: ${RTA_SHIELD_PROVIDER:-}
+      RTA_OLLAMA_URL: http://ollama:11434
+      RTA_OLLAMA_MODEL: ${RTA_OLLAMA_MODEL:-qwen2.5:3b}
+      RTA_CLASSIFIER: ${RTA_CLASSIFIER:-ollama}
+      RTA_USER_NAMES: ${RTA_USER_NAMES:-}
+      RTA_PROFILE: ${RTA_PROFILE:-}
+      RTA_AUTO_ANSWER: ${RTA_AUTO_ANSWER:-true}
+    networks: [backend, assist]
+    depends_on: [api]
     restart: unless-stopped
 
   # --- Descarga de modelos (solo con red). Ejecutar una vez: docker compose --profile setup run --rm models
@@ -83,6 +105,7 @@ services:
 
 networks:
   backend: { internal: true }
+  assist: { internal: true }  # web <-> asistente <-> privacy-shield
   edge: {}
 
 volumes: { pgdata: {}, appdata: {}, ollama: {}, shielddata: {} }

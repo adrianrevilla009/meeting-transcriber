@@ -17,6 +17,7 @@ PROTECTED = [
     ("get", "/meetings/1/progress"),
     ("post", "/meetings/1/finish"),
     ("get", "/meetings/1/transcript"),
+    ("get", "/meetings/1/segments"),
     ("post", "/meetings/1/analyze"),
     ("delete", "/meetings/1"),
     ("get", "/search?q=hola"),
@@ -149,6 +150,23 @@ def test_summary_is_exposed_on_the_meeting(client):
     m = client.get(f"/meetings/{mid}").json()
     assert m["analysis_status"] == "done" and m["summary"] == "El cliente exige pago con tarjeta."
     assert client.get("/meetings", params={"project": "pagos"}).json()[0]["summary"] == m["summary"]
+
+
+def test_segments_can_be_fetched_incrementally(client):
+    mid = new_meeting(client)
+    assert client.get(f"/meetings/{mid}/segments").json() == []
+    upload(client, mid, 0, "primera\nsegunda", source="system")
+    drain()
+    first = client.get(f"/meetings/{mid}/segments").json()
+    assert [s["text"] for s in first] == ["primera", "segunda"]
+    assert {"id", "source", "start", "end", "text"} <= set(first[0])
+    upload(client, mid, 1, "tercera", offset=10, source="mic")
+    drain()
+    new = client.get(f"/meetings/{mid}/segments", params={"after_id": first[-1]["id"]}).json()
+    assert [(s["text"], s["source"]) for s in new] == [("tercera", "mic")]
+    assert client.get(f"/meetings/{mid}/segments", params={"after_id": new[-1]["id"]}).json() == []
+    assert client.get(f"/meetings/{mid}/segments", params={"limit": 1}).json()[0]["text"] == "primera"
+    assert client.get("/meetings/999/segments").status_code == 404
 
 
 def test_progress_counts_by_status(client, session):

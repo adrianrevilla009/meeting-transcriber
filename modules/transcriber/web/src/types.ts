@@ -48,3 +48,26 @@ export interface SystemInfo {
   ollama_model_installed: boolean;
   queue: number;
 }
+
+// ---------- Asistente en vivo (módulo 3) ----------
+export interface AssistantStatus {
+  following: boolean;
+  questions: number;
+  answers: number;
+}
+
+export type AssistantEvent =
+  | {
+      id: number;
+      type: "question";
+      question_id: string;
+      text: string;
+      ts: number;
+      origin: "detected" | "manual";
+      score: number;
+    }
+  | { id: number; type: "answer_start"; question_id: string }
+  | { id: number; type: "answer_chunk"; question_id: string; content: string }
+  | { id: number; type: "answer_done"; question_id: string; content: string }
+  | { id: number; type: "error"; question_id?: string; error: string }
+  | { id: number; type: "status"; state: "following" | "stopped" };

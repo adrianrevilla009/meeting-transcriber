@@ -159,6 +159,15 @@ describe("Meeting page", () => {
     expect(await screen.findByText("Sin resumen")).toBeInTheDocument();
   });
 
+  it("has an Assistant tab that degrades gracefully when the service is down", async () => {
+    setup();
+    open();
+    await userEvent.click(await screen.findByRole("button", { name: /Asistente/ }));
+    expect(await screen.findByText("Asistente no disponible")).toBeInTheDocument();
+    // El resto de la página sigue entera.
+    expect(screen.getByRole("heading", { name: "Kickoff" })).toBeInTheDocument();
+  });
+
   it("unknown meeting", async () => {
     mockApi({});
     open("/meetings/99");

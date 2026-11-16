@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CloudUpload, Headphones, Info, Mic, MonitorSpeaker, Square, X } from "lucide-react";
+import { AlertTriangle, CloudUpload, Headphones, Info, Mic, MonitorSpeaker, Sparkles, Square, X } from "lucide-react";
 import { api } from "../api";
+import { livePref } from "../assistantPrefs";
 import { fmtTs } from "../format";
-import { CHUNK_SECONDS } from "../recorder/engine";
+import { LIVE_CHUNK_SECONDS } from "../recorder/engine";
 import { useElapsed, useRecorder } from "../recorder/RecorderContext";
 import { Spinner } from "../components/ui";
 import { Waveform } from "../components/Waveform";
 import { useToast } from "../components/Toasts";
+
+const LIVE_NOTE = `Trozos de ${LIVE_CHUNK_SECONDS} s: respuesta más rápida, transcripción algo menos precisa.`;
 
 function SourceToggle({
   on,
@@ -43,6 +46,7 @@ function Setup() {
   const [project, setProject] = useState("");
   const [mic, setMic] = useState(true);
   const [system, setSystem] = useState(true);
+  const [live, setLive] = useState(livePref.get);
   const { data: meetings } = useQuery({ queryKey: ["meetings"], queryFn: api.meetings });
   const projects = useMemo(() => [...new Set((meetings ?? []).map((m) => m.project).filter(Boolean))], [meetings]);
   const starting = rec.phase === "starting";
@@ -107,6 +111,22 @@ function Setup() {
           </div>
         )}
 
+        <label className="live-assistant">
+          <input
+            type="checkbox"
+            checked={live}
+            onChange={(e) => {
+              setLive(e.target.checked);
+              livePref.set(e.target.checked);
+            }}
+          />
+          <span>
+            <strong>Asistente en vivo</strong>
+            <span className="muted small">Detecta las preguntas que te hacen y sugiere respuestas.</span>
+            <span className="muted small">{LIVE_NOTE}</span>
+          </span>
+        </label>
+
         {rec.error && (
           <div className="alert alert-error">
             <AlertTriangle size={16} /> {rec.error}
@@ -122,7 +142,7 @@ function Setup() {
           className="record-orb"
           aria-label={starting ? "Preparando…" : "Empezar a grabar"}
           disabled={starting || (!mic && !system)}
-          onClick={() => rec.start({ title, project, mic, system })}
+          onClick={() => rec.start({ title, project, mic, system, assistant: live })}
         >
           <span className="orb-glow" />
           <span className="orb-core">{starting ? <Spinner size={34} /> : <Mic size={40} />}</span>
@@ -183,8 +203,17 @@ function Live() {
           <strong>{stats.sent}</strong> <span className="muted">fragmentos enviados</span>
         </div>
         <div>
-          <span className="muted">Siguiente envío cada {CHUNK_SECONDS} s</span>
+          <span className="muted">Siguiente envío cada {rec.chunkSeconds} s</span>
         </div>
+        {rec.assistant && rec.meeting && (
+          <div>
+            <Sparkles size={15} />
+            <span className="muted">Asistente en vivo activo</span>
+            <Link to={`/meetings/${rec.meeting.id}`} className="link">
+              Ver respuestas
+            </Link>
+          </div>
+        )}
         {stats.queued > 0 && (
           <div>
             <Spinner size={14} />{" "}

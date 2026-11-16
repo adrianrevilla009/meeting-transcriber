@@ -21,6 +21,26 @@ describe("Record setup", () => {
     await vi.waitFor(() => expect(document.querySelectorAll("#projects option")).toHaveLength(2));
   });
 
+  it("offers the live assistant, off by default, and remembers the choice", async () => {
+    mockApi({ "GET /meetings": [] });
+    renderApp(<Record />);
+    const box = screen.getByRole("checkbox", { name: /Asistente en vivo/ });
+    expect(box).not.toBeChecked();
+    expect(
+      screen.getByText(/Trozos de 12 s: respuesta más rápida, transcripción algo menos precisa/),
+    ).toBeInTheDocument();
+    await userEvent.click(box);
+    expect(box).toBeChecked();
+    expect(localStorage.getItem("mt_assistant_live")).toBe("1");
+  });
+
+  it("starts with the live assistant already on when it was chosen before", async () => {
+    localStorage.setItem("mt_assistant_live", "1");
+    mockApi({ "GET /meetings": [] });
+    renderApp(<Record />);
+    expect(screen.getByRole("checkbox", { name: /Asistente en vivo/ })).toBeChecked();
+  });
+
   it("cannot start with no sources", async () => {
     mockApi({ "GET /meetings": [] });
     renderApp(<Record />);

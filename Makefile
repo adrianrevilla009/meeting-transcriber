@@ -31,7 +31,7 @@ SERVICES := db api worker web ollama
 endif
 
 .PHONY: help start open web-dev test-api test-web test-e2e test-all coverage env check models whisper-model llm-model up down restart logs ps health \
-        ollama-check agent-install record meetings transcript search test clean shield-up shield-down shield-logs
+        ollama-check agent-install record meetings transcript search test clean shield-up shield-down shield-logs assistant-up assistant-down assistant-logs
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
@@ -161,3 +161,13 @@ shield-down: ## Para el proxy de ofuscación
 
 shield-logs: ## Sigue los logs del proxy de ofuscación
 	@docker compose --profile shield logs -f privacy-shield
+
+# ---------- Módulo 3: realtime-assistant (ver modules/realtime-assistant/README.md) ----------
+assistant-up: ## Arranca privacy-shield + el asistente en vivo (panel "Asistente" en la web)
+	@docker compose --profile shield up -d --build privacy-shield assistant
+
+assistant-down: ## Para el asistente en vivo
+	@docker compose --profile shield stop assistant
+
+assistant-logs: ## Sigue los logs del asistente
+	@docker compose --profile shield logs -f assistant

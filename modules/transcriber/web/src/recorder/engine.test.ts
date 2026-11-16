@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { ChunkAccumulator, encodeWav, resample, Uploader, type AudioChunk, type UploadStats } from "./engine";
+import {
+  CHUNK_SECONDS,
+  ChunkAccumulator,
+  encodeWav,
+  LIVE_CHUNK_SECONDS,
+  resample,
+  SourceCapture,
+  Uploader,
+  type AudioChunk,
+  type UploadStats,
+} from "./engine";
 
 // jsdom no implementa Blob.arrayBuffer(); FileReader sí.
 const readBlob = (blob: Blob) =>
@@ -173,5 +183,67 @@ describe("Uploader", async () => {
 
   it("idle resolves immediately when there is nothing to send", async () => {
     await expect(new Uploader(1, () => undefined).idle()).resolves.toBeUndefined();
+  });
+});
+
+describe("chunk length", () => {
+  const block = (seconds: number) => new Float32Array(seconds * 1000).fill(0.1); // 1 kHz
+
+  it("uses 45 s by default and a shorter 12 s for the live assistant", () => {
+    expect(CHUNK_SECONDS).toBe(45);
+    expect(LIVE_CHUNK_SECONDS).toBe(12);
+    expect(LIVE_CHUNK_SECONDS).toBeLessThan(CHUNK_SECONDS);
+  });
+
+  it("ChunkAccumulator cuts at the default length when none is given", () => {
+    const chunks: AudioChunk[] = [];
+    const acc = new ChunkAccumulator("mic", 1000, (c) => chunks.push(c));
+    acc.push(block(44));
+    expect(chunks).toHaveLength(0);
+    acc.push(block(1));
+    expect(chunks.map((c) => c.seconds)).toEqual([45]);
+  });
+
+  describe("SourceCapture", () => {
+    class FakeNode {
+      static last: FakeNode;
+      port: {
+        onmessage: ((e: { data: { data: Float32Array; final: boolean } }) => void) | null;
+        postMessage: () => void;
+      } = { onmessage: null, postMessage: () => undefined };
+      constructor() {
+        FakeNode.last = this;
+      }
+      connect = () => ({ connect: () => undefined });
+      disconnect = () => undefined;
+    }
+
+    const ctx = {
+      sampleRate: 1000,
+      destination: {},
+      createMediaStreamSource: () => ({ connect: () => undefined, disconnect: () => undefined }),
+      createAnalyser: () => ({ fftSize: 0, smoothingTimeConstant: 0 }),
+      createGain: () => ({ gain: { value: 1 }, connect: () => undefined, disconnect: () => undefined }),
+    } as unknown as AudioContext;
+
+    const feed = (seconds: number) => FakeNode.last.port.onmessage?.({ data: { data: block(seconds), final: false } });
+
+    it("cuts chunks at the configured chunkSeconds", () => {
+      vi.stubGlobal("AudioWorkletNode", FakeNode);
+      const chunks: AudioChunk[] = [];
+      new SourceCapture(ctx, {} as MediaStream, "mic", (c) => chunks.push(c), LIVE_CHUNK_SECONDS);
+      feed(11);
+      expect(chunks).toHaveLength(0);
+      feed(1);
+      expect(chunks.map((c) => [c.seq, c.seconds])).toEqual([[0, 12]]);
+    });
+
+    it("keeps 45 s when no length is given", () => {
+      vi.stubGlobal("AudioWorkletNode", FakeNode);
+      const chunks: AudioChunk[] = [];
+      new SourceCapture(ctx, {} as MediaStream, "system", (c) => chunks.push(c));
+      feed(12);
+      expect(chunks).toHaveLength(0);
+    });
   });
 });

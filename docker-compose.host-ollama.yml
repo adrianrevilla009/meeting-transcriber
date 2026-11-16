@@ -7,6 +7,11 @@ services:
       MT_OLLAMA_URL: http://host.docker.internal:11434
     extra_hosts: ["host.docker.internal:host-gateway"]
     networks: [backend, edge]
+  assistant:  # el clasificador local del asistente también usa el Ollama del host
+    environment:
+      RTA_OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [backend, assist, edge]  # edge para alcanzar el host; el asistente solo usa su allowlist
   api:  # solo para informar del estado de Ollama en el frontal (/system)
     environment:
       MT_OLLAMA_URL: http://host.docker.internal:11434

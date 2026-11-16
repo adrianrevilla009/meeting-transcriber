@@ -189,6 +189,19 @@ def transcript(
     return [SegmentOut.model_validate(s) for s in segs]
 
 
+@router.get("/meetings/{meeting_id}/segments", response_model=list[SegmentOut], dependencies=[Auth])
+def segments_after(
+    meeting_id: int,
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=1000),
+    session: Session = Depends(get_session),
+):
+    """Segmentos nuevos (id > after_id) en orden de aparición: lo usa el asistente en vivo para seguir la reunión."""
+    _meeting(session, meeting_id)
+    query = select(Segment).where(Segment.meeting_id == meeting_id, Segment.id > after_id)
+    return session.scalars(query.order_by(Segment.id).limit(limit)).all()
+
+
 @router.post("/meetings/{meeting_id}/analyze", response_model=MeetingOut, status_code=202, dependencies=[Auth])
 def reanalyze(meeting_id: int, session: Session = Depends(get_session)):
     """Encola un reanálisis: el worker lo recoge al volver a pasar la reunión por 'finished'."""
