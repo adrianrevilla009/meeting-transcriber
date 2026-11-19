@@ -238,5 +238,77 @@ jobs:
           cache-from: type=gha,scope=assistant
           cache-to: type=gha,mode=max,scope=assistant
 
-# Los e2e (pytest -m e2e y Playwright) necesitan Whisper y Ollama con modelos de varios GB:
-# se ejecutan en local con `make test-e2e`.
+  e2e:
+    name: E2E (stack completo en Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      E2E_COMPOSE: docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml --profile shield
+      E2E_SERVICES: db api worker web privacy-shield assistant stub-llm
+      MT_API_TOKEN: e2e-mt-token-0123456789abcdef
+      ANON_API_TOKEN: e2e-anon-token-0123456789abcdef
+      POSTGRES_PASSWORD: e2e-postgres-password
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar el stack (tokens de prueba, sin secretos reales)
+        run: |
+          cp .env.example .env
+          {
+            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
+            echo "MT_API_TOKEN=$MT_API_TOKEN"
+            echo "ANON_API_TOKEN=$ANON_API_TOKEN"
+          } >> .env
+      - name: Construir y levantar el stack
+        run: |
+          $E2E_COMPOSE up -d db
+          until $E2E_COMPOSE exec -T db pg_isready -U mt; do sleep 2; done
+          $E2E_COMPOSE up -d --build $E2E_SERVICES
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: e2e/requirements.txt
+      - run: pip install -r e2e/requirements.txt
+      - name: Tests E2E de API (módulos 1, 2 y 3 juntos)
+        working-directory: e2e
+        run: |
+          set -o pipefail
+          pytest 2>&1 | tee out.txt
+      - name: Anotar fallos de la API
+        if: failure()
+        working-directory: e2e
+        run: |
+          body=$( { grep -E '^(FAILED|ERROR|E  )' out.txt | head -40; tail -5 out.txt; } | cut -c1-250 | head -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Fallos de los E2E de API::$body"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modules/transcriber/web/package-lock.json
+      - name: Instalar dependencias del navegador
+        working-directory: modules/transcriber/web
+        run: npm ci
+      - name: Tests E2E de navegador (Chrome, micrófono falso)
+        working-directory: modules/transcriber/web
+        env:
+          MT_E2E_STUB: "1"
+        run: |
+          set -o pipefail
+          npx playwright test e2e/stack.spec.ts 2>&1 | tee pw.txt
+      - name: Anotar fallos del navegador
+        if: failure()
+        working-directory: modules/transcriber/web
+        run: |
+          body=$(grep -vE '^\s*$' pw.txt | tail -70 | cut -c1-220 | head -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Fallos de los E2E de navegador::$body"
+      - name: Logs de los servicios
+        if: failure()
+        run: |
+          body=$($E2E_COMPOSE logs --no-color --tail=25 api worker assistant privacy-shield stub-llm 2>&1 | cut -c1-200 | tail -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Logs de los servicios::$body"
+      - name: Apagar el stack
+        if: always()
+        run: $E2E_COMPOSE down -v
+
+# El job 'e2e' levanta el stack entero con transcriptor y LLM falsos (e2e/). Los e2e con Whisper y Ollama reales
+# (modelos de varios GB) se ejecutan en local con `make test-e2e`.

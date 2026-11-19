@@ -31,7 +31,7 @@ SERVICES := db api worker web ollama
 endif
 
 .PHONY: help start open web-dev test-api test-web test-e2e test-all coverage env check models whisper-model llm-model up down restart logs ps health \
-        ollama-check agent-install record meetings transcript search test clean shield-up shield-down shield-logs assistant-up assistant-down assistant-logs
+        ollama-check agent-install record meetings transcript search test clean shield-up shield-down shield-logs assistant-up assistant-down assistant-logs test-e2e-stack
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' Makefile | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-15s\033[0m %s\n",$$1,$$2}'
@@ -171,3 +171,10 @@ assistant-down: ## Para el asistente en vivo
 
 assistant-logs: ## Sigue los logs del asistente
 	@docker compose --profile shield logs -f assistant
+
+# ---------- E2E del stack completo con transcriptor y LLM falsos (lo mismo que hace el CI; ver e2e/README.md) ----------
+E2E_COMPOSE := docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml --profile shield
+test-e2e-stack: ## E2E de los 3 módulos en Docker con LLM falso (pesado: construye 5 imágenes)
+	$(E2E_COMPOSE) up -d --build db api worker web privacy-shield assistant stub-llm
+	cd e2e && E2E_COMPOSE="$(E2E_COMPOSE)" $(PYTHON) -m pytest
+	$(E2E_COMPOSE) down -v

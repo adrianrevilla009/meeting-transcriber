@@ -1,0 +1,33 @@
+# Override para los E2E: mismo stack real, pero con transcriptor falso (el "audio" es texto) y un LLM falso
+# (stub-llm) en lugar de Ollama/Whisper/proveedores en la nube. Uso (desde la raíz del repo):
+#   docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml --profile shield up -d --build \
+#     db api worker web privacy-shield assistant stub-llm
+services:
+  stub-llm:
+    build: ./e2e/stub_llm
+    ports: ["127.0.0.1:11435:11434"]  # solo para que los tests lean lo que "salió" hacia el LLM
+    networks: [backend, assist]
+
+  api:
+    environment:
+      MT_OLLAMA_URL: http://stub-llm:11434
+  worker:
+    environment:
+      MT_OLLAMA_URL: http://stub-llm:11434
+      MT_TRANSCRIBER: fake
+      MT_ANALYZER: ollama
+      MT_WORKER_POLL_SECONDS: "0.5"
+
+  privacy-shield:
+    environment:
+      ANON_OLLAMA_URL: http://stub-llm:11434
+      ANON_DEFAULT_PROVIDER: ollama
+      ANON_SKIP_LOCAL: "false"  # el "LLM local" también pasa por el filtro: así se comprueba lo que saldría
+
+  assistant:
+    environment:
+      RTA_OLLAMA_URL: http://stub-llm:11434
+      RTA_SHIELD_PROVIDER: ollama
+      RTA_CLASSIFIER: ollama
+      RTA_POLL_SECONDS: "0.5"
+      RTA_ANSWER_COOLDOWN_SECONDS: "1"

@@ -69,6 +69,8 @@ que reciben `session` y `rt`, sin estado global.
   privacy-shield). Se documentan en el README del módulo y en `.env.example`.
 - **CI en GitHub** (no se ejecuta en local): lint (`ruff`), tipos (`mypy`), arquitectura (`lint-imports`),
   seguridad (`bandit`), tests y construcción de imagen por módulo.
+- **E2E del sistema completo** (`e2e/`): los tres módulos en Docker con transcriptor y LLM falsos; comprueba
+  el cableado real, que no sale ningún dato personal y el aislamiento de red. Ver `e2e/README.md`.
 - **Código compartido**: no hay librería común todavía. Si dos módulos necesitan lo mismo, se duplica hasta que
   aparezca la tercera necesidad; entonces se extrae a `libs/<nombre>` con su propio paquete.
 - **Redes Docker**: solo `privacy-shield` tendrá salida a Internet; el resto, en redes internas, y hablarán con
