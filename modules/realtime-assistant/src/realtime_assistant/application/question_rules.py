@@ -34,7 +34,8 @@ _DIRECTED = re.compile(
     re.IGNORECASE,
 )
 _TAG_END = re.compile(r",\s*¿?\s*(?:verdad|no|vale|eh|ok|sí|si|cierto|de acuerdo)\s*\?\s*$", re.IGNORECASE)
-_SENTENCE = re.compile(r"[^.!?…]+[.!?…]*")
+# Una frase acaba en . ! ? o … SEGUIDOS de un espacio: así "marta@empresa.es" o "2.5" no la parten.
+_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
 _WORDS = re.compile(r"\w+")
 
 
@@ -65,7 +66,7 @@ class RuleQuestionDetector:
         for text, ts, source in _utterances(segments):
             if source not in self._listen:
                 continue
-            for sentence in _SENTENCE.findall(text):
+            for sentence in _SENTENCE_END.split(text):
                 score = self.score(sentence)
                 if score >= self._threshold:
                     found.append(Candidate(sentence.strip(), ts, source, round(score, 2)))

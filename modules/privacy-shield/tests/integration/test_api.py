@@ -174,6 +174,25 @@ def test_chat_streaming_equals_non_streaming() -> None:
     assert "marta@example.org" not in fake.captured_payloads()[1]
 
 
+def test_a_value_found_in_a_later_message_is_swept_from_the_earlier_ones() -> None:
+    fake = FakeLLMAdapter()
+    rt, _, _ = make_runtime(adapters=[fake])
+    body = {
+        "messages": [
+            {"role": "system", "content": "No olvides a marta en la lista."},  # sin pista: no se detecta aquí
+            {"role": "user", "content": "Habla con Marta mañana."},  # aquí sí ("con" es una pista)
+        ]
+    }
+    r = client_for(rt).post("/v1/chat", json=body, headers=AUTH)
+    assert r.status_code == 200, r.text
+    [call] = fake.calls
+    assert [m.content for m in call.messages] == [
+        "No olvides a [PERSONA_1] en la lista.",
+        "Habla con [PERSONA_1] mañana.",
+    ]
+    assert "arta" not in fake.captured_payloads()[0]
+
+
 def test_leak_guard_blocks_what_the_detector_missed() -> None:
     class Blind:
         def detect(self, text: str, *, language: str = "es") -> list[DetectedEntity]:

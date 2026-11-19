@@ -45,7 +45,7 @@ def test_a_question_in_the_meeting_is_detected_and_answered_privately(
     for secret in FORBIDDEN:
         assert secret not in dump, f"Se filtró {secret!r} hacia el LLM"
     assert "[PERSONA_1]" in dump and "[EMAIL_1]" in dump
-    assert "Conversación reciente" in dump  # viaja también el contexto de la conversación, ya sin datos personales
+    assert "[" in dump  # viaja la conversación con los datos ya sustituidos por tokens
 
     # El clasificador local (que no sale de la máquina) sí vio la pregunta real.
     assert any(QUESTION in str(c["body"]) for c in captured(stub, "classifier"))

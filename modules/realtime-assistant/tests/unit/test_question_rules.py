@@ -51,6 +51,17 @@ def test_question_ending_in_no_is_not_a_tag_question() -> None:
     assert questions(seg(1, "¿Puedes decirme si es así o no?")) == ["¿Puedes decirme si es así o no?"]
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "¿Puedes enviar el contrato a Marta García (marta@empresa.es) esta semana?",
+        "¿Cuánto cuesta la versión 2.5 del plan en www.empresa.es/precios?",
+    ],
+)
+def test_dots_inside_emails_urls_and_numbers_do_not_split_the_question(text: str) -> None:
+    assert questions(seg(1, text)) == [text]
+
+
 def test_only_listens_to_others() -> None:
     assert questions(seg(1, "¿Tú qué opinas del plazo?", source="mic")) == []
     assert questions(seg(1, "¿Tú qué opinas del plazo?", source="system")) == ["¿Tú qué opinas del plazo?"]

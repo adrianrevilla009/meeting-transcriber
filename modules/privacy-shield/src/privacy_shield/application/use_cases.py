@@ -64,6 +64,9 @@ class Anonymizer:
             raise DetectorUnavailable(f"El detector falló ({type(exc).__name__})") from exc
         return self._pseudonymizer.apply(session, text, entities)
 
+    def sweep(self, session: SessionId, text: str) -> str:
+        return self._pseudonymizer.sweep(session, text)
+
 
 @dataclass(frozen=True)
 class AnonymizeResult:
@@ -232,6 +235,12 @@ class ProtectedChat:
             anon_value = self._anonymizer.anonymize(session, value)
             replacements.extend(anon_value.replacements)
             metadata[key] = anon_value.text
+        # Segunda pasada: un valor descubierto en un mensaje posterior puede seguir en uno anterior (p. ej. el sistema).
+        messages = [
+            ChatMessage(m.role, self._anonymizer.sweep(session, m.content), self._sweep_name(session, m.name))
+            for m in messages
+        ]
+        metadata = {k: self._anonymizer.sweep(session, v) for k, v in metadata.items()}
         outgoing = ChatRequest(tuple(messages), request.model, request.temperature, request.max_tokens, metadata)
         detect_ms = self._clock.perf_ms() - t0
         # Segunda barrera sobre TODO lo que sale (contenidos, nombres, modelo y metadatos).
@@ -239,6 +248,9 @@ class ProtectedChat:
         payload += [request.model or "", *metadata.keys(), *metadata.values()]
         self._guard.check(session, payload)
         return outgoing, tuple(replacements), detect_ms
+
+    def _sweep_name(self, session: SessionId, name: str | None) -> str | None:
+        return self._anonymizer.sweep(session, name) if name else name
 
     # ------------------------------------------------------------------ ejecución
     async def complete(self, prepared: PreparedChat) -> ChatResult:

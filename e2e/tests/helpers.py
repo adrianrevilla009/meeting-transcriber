@@ -92,7 +92,8 @@ def wait_event(web: httpx.Client, meeting_id: int, event_type: str, *, count: in
     try:
         return wait_until(check, timeout, what=f"evento '{event_type}' x{count} en la reunión {meeting_id}")
     except AssertionError as exc:
-        raise AssertionError(f"{exc}. Eventos recibidos: {events(web, meeting_id)}") from None
+        brief = [(e["type"], e.get("error"), e.get("question_id")) for e in events(web, meeting_id)]
+        raise AssertionError(f"{exc}. Eventos (tipo, error, pregunta): {brief}") from None
 
 
 def captured(stub: httpx.Client, kind: str | None = None) -> list[dict[str, Any]]:

@@ -50,7 +50,7 @@ class Pseudonymizer:
         out = text
         for e, rep in reversed(planned):
             out = out[: e.start] + rep.token + out[e.end :]
-        out = self._sweep_known(session, out)
+        out = self.sweep(session, out)
         return AnonymizedText(out, tuple(rep for _, rep in planned))
 
     # ------------------------------------------------------------------ tokens
@@ -91,8 +91,12 @@ class Pseudonymizer:
         return self._vault.get_or_create_token(session, EntityType.PERSONA, value)
 
     # ------------------------------------------------------------------ barrido
-    def _sweep_known(self, session: SessionId, text: str) -> str:
-        """Sustituye apariciones que el detector no marcó de valores ya conocidos en la sesión."""
+    def sweep(self, session: SessionId, text: str) -> str:
+        """Sustituye apariciones que el detector no marcó de valores ya conocidos en la sesión.
+
+        Se aplica a cada texto tras anonimizarlo y de nuevo al final sobre TODOS los mensajes de una petición:
+        un valor descubierto en un mensaje posterior puede aparecer sin detectar en uno anterior.
+        """
         pairs: list[tuple[str, str]] = []
         for t, value in self._vault.known_values(session):
             if self._policy.strategy_for(t) != Strategy.PSEUDONYMIZE or len(value.strip()) < 3:
