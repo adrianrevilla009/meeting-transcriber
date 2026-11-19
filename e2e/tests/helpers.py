@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 import time
+from pathlib import Path
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -17,6 +18,7 @@ MT_TOKEN = os.environ.get("MT_API_TOKEN", "e2e-mt-token-0123456789abcdef")
 ANON_TOKEN = os.environ.get("ANON_API_TOKEN", "e2e-anon-token-0123456789abcdef")
 COMPOSE = os.environ.get("E2E_COMPOSE", "")
 PROJECT = "__e2e__"
+ROOT = Path(__file__).resolve().parents[2]  # raíz del repo: los -f de COMPOSE son relativos a ella
 
 T = TypeVar("T")
 
@@ -87,7 +89,10 @@ def wait_event(web: httpx.Client, meeting_id: int, event_type: str, *, count: in
         found = events(web, meeting_id)
         return found if sum(e["type"] == event_type for e in found) >= count else None
 
-    return wait_until(check, timeout, what=f"evento '{event_type}' x{count} en la reunión {meeting_id}")
+    try:
+        return wait_until(check, timeout, what=f"evento '{event_type}' x{count} en la reunión {meeting_id}")
+    except AssertionError as exc:
+        raise AssertionError(f"{exc}. Eventos recibidos: {events(web, meeting_id)}") from None
 
 
 def captured(stub: httpx.Client, kind: str | None = None) -> list[dict[str, Any]]:
@@ -99,4 +104,5 @@ def captured(stub: httpx.Client, kind: str | None = None) -> list[dict[str, Any]
 def compose(*args: str, timeout: float = 120.0) -> subprocess.CompletedProcess[str]:
     """Ejecuta `docker compose ...` con los mismos ficheros con los que se levantó el stack."""
     assert COMPOSE, "Define E2E_COMPOSE (en CI lo hace el workflow)"
-    return subprocess.run([*shlex.split(COMPOSE), *args], capture_output=True, text=True, timeout=timeout, check=False)  # noqa: S603
+    cmd = [*shlex.split(COMPOSE), *args]
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, cwd=ROOT)  # noqa: S603

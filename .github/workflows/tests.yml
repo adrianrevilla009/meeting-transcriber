@@ -312,6 +312,8 @@ jobs:
           done
           body=$($E2E_COMPOSE logs --no-color --tail=60 assistant privacy-shield api 2>&1 | grep -v 'GET /health' | cut -c1-220 | tail -c 2500 | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=Logs de assistant, shield y api::$body"
+          body=$($E2E_COMPOSE logs --no-color assistant privacy-shield stub-llm 2>&1 | grep -iE 'error|exception|traceback|warning|bloque|rechaz| 4[0-9][0-9] | 5[0-9][0-9] ' | cut -c1-220 | tail -c 3000 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Errores de assistant, shield y stub::$body"
       - name: Apagar el stack
         if: always()
         run: $E2E_COMPOSE down -v
