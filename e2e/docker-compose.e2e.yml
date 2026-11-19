@@ -6,7 +6,7 @@ services:
   stub-llm:
     build: ./e2e/stub_llm
     ports: ["127.0.0.1:11435:11434"]  # solo para que los tests lean lo que "salió" hacia el LLM
-    networks: [backend, assist]
+    networks: [backend, assist, edge]  # edge: Docker no publica puertos de contenedores solo en redes internas
 
   api:
     environment:

@@ -29,6 +29,8 @@ services:
   worker:
     <<: *app
     command: ["python", "-m", "transcriber.bootstrap.worker"]
+    healthcheck:
+      disable: true  # la imagen trae el healthcheck HTTP de la API; el worker no sirve HTTP
     networks: [backend]
     restart: unless-stopped
 
