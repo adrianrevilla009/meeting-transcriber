@@ -301,11 +301,17 @@ jobs:
         run: |
           body=$(grep -vE '^\s*$' pw.txt | tail -70 | cut -c1-220 | head -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=Fallos de los E2E de navegador::$body"
-      - name: Logs de los servicios
+      - name: Diagnóstico del stack
         if: failure()
         run: |
-          body=$($E2E_COMPOSE logs --no-color --tail=25 api worker assistant privacy-shield stub-llm 2>&1 | cut -c1-200 | tail -c 3800 | sed ':a;N;$!ba;s/\n/%0A/g')
-          echo "::error title=Logs de los servicios::$body"
+          body=$($E2E_COMPOSE ps -a --format '{{.Service}}: {{.Status}}' 2>&1 | head -c 1500 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Estado de los contenedores::$body"
+          for s in web stub-llm worker; do
+            body=$($E2E_COMPOSE logs --no-color --tail=30 $s 2>&1 | grep -v 'GET /health' | cut -c1-220 | tail -c 1800 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Logs de $s::$body"
+          done
+          body=$($E2E_COMPOSE logs --no-color --tail=60 assistant privacy-shield api 2>&1 | grep -v 'GET /health' | cut -c1-220 | tail -c 2500 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Logs de assistant, shield y api::$body"
       - name: Apagar el stack
         if: always()
         run: $E2E_COMPOSE down -v
